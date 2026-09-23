@@ -81,6 +81,24 @@ reported as `matched`, `ambiguous`, `unmatched`, or `incomplete` if a library
 search failed. Scores are suggestions for review, not evidence that two catalog
 records are the same work. Import and match make no circulation changes.
 
+To check one format for the saved list, use:
+
+```bash
+libbyctl lists availability booker-2026 --format audiobook
+libbyctl lists availability booker-2026 --format audiobook --json
+```
+
+This checks the catalog collections associated with cards on the **CLI's
+connected Libby identity**. Connect the CLI through **Recover Your Data** from
+the Libby app that has your saved cards; adding one card to a fresh browser
+identity does not copy the others. If the CLI is already connected to the wrong
+identity, run `libbyctl auth logout` and then `libbyctl setup`, selecting
+**Recover Your Data** in the new browser window. This removes only the CLI's
+saved identity and dedicated browser profile; it leaves the main Libby app and
+local reading lists intact. The command reports public catalog
+availability, not a guarantee that a particular card can borrow. Partner
+collections without a saved card are not searched yet.
+
 The bundled 2026 Booker longlist example is transcribed from the
 [official Booker announcement](https://thebookerprizes.com/media-centre/press-releases/longlist-for-booker-prize-2026-rewards-risk).
 

@@ -12,9 +12,13 @@ The public-release gate remains open for clean-machine sign-in, naturally
 expired credentials, multiple cards, and Windows/Linux/Intel platform checks.
 
 Phase 2 has begun as a preview: CSV/text/ISBN import, reviewed direct-file URL
-import, normalization, work/edition grouping, and explicit match states. The
+import, normalization, work/edition grouping, explicit match states, and a
+read-only format-specific list availability report. The
 13-title 2026 Booker example received a result for every entry in the connected
-library, but match quality and absent titles still need independent review.
+library, but match quality and absent titles still need independent review. The
+CLI identity currently has only one saved card; the user's main Libby app has
+more libraries. Recovering that app's saved cards and discovering unsaved partner
+collections are open before claiming full-account coverage.
 
 Phase 3 now has persistent read-only plans and refresh. A live one-card check
 classified the 13-title example and saved/refreshed it in an isolated database.

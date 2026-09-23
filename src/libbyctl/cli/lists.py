@@ -6,6 +6,7 @@ import hashlib
 import ipaddress
 import json
 from dataclasses import asdict
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
@@ -15,10 +16,16 @@ import typer
 
 from libbyctl.config.settings import Settings
 from libbyctl.exceptions import LibbyCtlError
+from libbyctl.services.list_availability import check_list_availability
 from libbyctl.services.reading_lists import ItemMatch, match_item, normalize, parse_list
 from libbyctl.storage.reading_lists import load_list, save_list
 
 app = typer.Typer(no_args_is_help=True, help="Import reading lists and find catalog matches.")
+
+
+class ListFormat(StrEnum):
+    ebook = "ebook"
+    audiobook = "audiobook"
 
 
 def _item_line(index: int, title: str, isbn: str, author: str) -> str:
@@ -174,3 +181,68 @@ def match_list(
             ))
         if warnings:
             typer.echo("Warning: some library searches failed: " + ", ".join(sorted(warnings)))
+
+
+@app.command("availability")
+def list_availability(
+    list_id: Annotated[str, typer.Argument(help="Saved reading-list ID")],
+    media_type: Annotated[ListFormat, typer.Option("--format")] = ListFormat.audiobook,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Check one format across the collections of the connected Libby cards."""
+    from libbyctl.cli.app import _load_account
+    from libbyctl.services.account import require_resolved_libraries, website_ids_from_sync
+
+    _, items = load_list(Settings.load().database_path, list_id)
+    settings, _, libby, catalog, sync = _load_account()
+    try:
+        websites = website_ids_from_sync(sync)
+        libraries = catalog.libraries_by_website_ids(websites)
+        require_resolved_libraries(websites, libraries)
+        reports = check_list_availability(
+            items, libraries, catalog,
+            media_type=media_type.value, max_concurrency=settings.max_concurrency,
+        )
+    finally:
+        libby.close()
+        catalog.close()
+    if json_output:
+        typer.echo(json.dumps({
+            "schema_version": 1,
+            "format": media_type.value,
+            "searched_libraries": [library.name for library in libraries],
+            "items": [asdict(report) for report in reports],
+        }, indent=2))
+        return
+    typer.echo(f"{media_type.value.title()} catalog availability across "
+               f"{len(libraries)} saved-card collection(s):")
+    for report in reports:
+        title = report.item.title or report.item.isbn
+        available = [offer for offer in report.offers if offer.available_now is True]
+        waiting = [
+            offer for offer in report.offers
+            if offer.available_now is False and offer.owned_copies != 0
+        ]
+        unknown = [offer for offer in report.offers if offer.available_now is None]
+        if available:
+            detail = "available now: " + ", ".join(offer.library for offer in available)
+        elif waiting:
+            shortest = waiting[0]
+            estimate = (
+                f"~{shortest.estimated_wait_days} days"
+                if shortest.estimated_wait_days is not None else "wait unknown"
+            )
+            detail = f"catalog match; shortest estimate {estimate} at {shortest.library}"
+        elif unknown:
+            detail = "catalog match; availability unknown"
+        elif report.offers:
+            detail = "catalog listing; no lendable copies reported"
+        else:
+            detail = "no confident catalog match"
+        typer.echo(f"{title}: {detail}")
+        if report.match_status in {"ambiguous", "review", "incomplete"}:
+            typer.echo(f"  Review needed: {report.match_status}")
+    typer.echo(
+        "Scope: saved-card collections only. Unsaved partner collections are not searched. "
+        "Catalog availability does not guarantee this card can borrow a title."
+    )
