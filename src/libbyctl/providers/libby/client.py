@@ -159,8 +159,10 @@ class LibbyClient:
             )
             if state.get("result") == "fulfilled":
                 blessing = state.get("blessing")
-                if not blessing:
-                    raise AuthenticationError("Libby approved pairing without a transfer token.")
+                if not blessing or blessing == "failure":
+                    raise AuthenticationError(
+                        "Libby did not return a valid device-transfer token."
+                    )
                 self._request("POST", "chip/clone", json={"blessing": blessing})
                 # Cloning replaces this device's temporary identity. Libby's recovery flow
                 # discards it and acquires a fresh identity before syncing the recovered data.

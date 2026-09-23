@@ -84,6 +84,22 @@ def test_pairing_rejects_identity_replacement():
     client.close()
 
 
+def test_pairing_stops_when_libby_returns_failure_blessing():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/chip":
+            return httpx.Response(200, json={"chip": "new-chip", "identity": "new-token"})
+        if request.url.path == "/chip/clone/code":
+            if request.url.params.get("code") == "":
+                return httpx.Response(200, json={"code": "12345678", "expiry": 2_000_000_000})
+            return httpx.Response(200, json={"result": "fulfilled", "blessing": "failure"})
+        raise AssertionError(f"unexpected request to {request.url.path}")
+
+    client = LibbyClient("https://example.test", transport=httpx.MockTransport(handler))
+    with pytest.raises(AuthenticationError, match="valid device-transfer token"):
+        client.login_with_device_pairing(lambda _code, _expires: None)
+    client.close()
+
+
 @pytest.mark.parametrize(
     ("status", "failure"),
     [(401, "identity token"), (403, "request")],
