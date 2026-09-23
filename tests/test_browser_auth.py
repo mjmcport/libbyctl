@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from typer.testing import CliRunner
 
@@ -156,5 +158,7 @@ def test_browser_restarts_same_profile_and_checks_account(monkeypatch, tmp_path,
     assert launches[0] == launches[1]
     assert launches[0][1] == {"channel": "chrome", "headless": False}
     assert all(context.closed for context in contexts)
-    assert profile.stat().st_mode & 0o777 == 0o700
+    assert profile.is_dir()
+    if os.name != "nt":
+        assert profile.stat().st_mode & 0o777 == 0o700
     assert "private-token" not in " ".join(messages)
