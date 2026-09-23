@@ -90,7 +90,10 @@ def test_pairing_rejects_identity_replacement():
 )
 def test_auth_error_identifies_endpoint_without_echoing_pairing_code(status, failure):
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status)
+        return httpx.Response(
+            status,
+            json={"result": "invalid blessing", "message": "12345678 secret-token"},
+        )
 
     client = LibbyClient(
         "https://example.test", token="secret-token", transport=httpx.MockTransport(handler)
@@ -104,6 +107,7 @@ def test_auth_error_identifies_endpoint_without_echoing_pairing_code(status, fai
     assert "chip/clone/code" in str(exc_info.value)
     assert failure in str(exc_info.value)
     assert f"HTTP {status}" in str(exc_info.value)
+    assert "invalid_blessing" in str(exc_info.value)
     assert "12345678" not in str(exc_info.value)
     assert "secret-token" not in str(exc_info.value)
     client.close()

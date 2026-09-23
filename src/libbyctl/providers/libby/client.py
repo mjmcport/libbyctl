@@ -87,9 +87,11 @@ class LibbyClient:
         if response.status_code in (401, 403):
             endpoint = path.lstrip("/")
             failure = "identity token" if response.status_code == 401 else "request"
+            result = _result_code(response)
+            detail = f"; result: {result}" if result else ""
             raise AuthenticationError(
                 f"Libby rejected the {failure} for {endpoint} "
-                f"(HTTP {response.status_code})."
+                f"(HTTP {response.status_code}{detail})."
             )
         if response.status_code == 404:
             detail = _result_text(response)
@@ -217,6 +219,20 @@ def _result_text(response: httpx.Response) -> str:
         if value:
             return str(value)
     return response.text.strip()
+
+
+def _result_code(response: httpx.Response) -> str | None:
+    try:
+        body = response.json()
+    except Exception:
+        return None
+    if not isinstance(body, dict) or not isinstance(body.get("result"), str):
+        return None
+    value = "".join(
+        character if character.isalnum() or character in "._-" else "_"
+        for character in body["result"]
+    )[:80]
+    return value.strip("_") or None
 
 
 def _code_expiry(value: Any) -> float:
