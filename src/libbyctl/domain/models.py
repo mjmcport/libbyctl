@@ -61,3 +61,15 @@ class SearchResult(BaseModel):
     library: Library
     item: CatalogItem
     availability: Availability | None = None
+
+
+class SearchWarning(BaseModel):
+    library_key: str
+    stage: Literal["search", "availability"]
+    title_id: str | None = None
+    message: str
+
+
+class SearchReport(BaseModel):
+    results: list[SearchResult] = Field(default_factory=list)
+    warnings: list[SearchWarning] = Field(default_factory=list)

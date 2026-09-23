@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def initialize_database(path: Path) -> None:
@@ -26,6 +26,20 @@ def initialize_database(path: Path) -> None:
                 cache_key TEXT PRIMARY KEY,
                 expires_at TEXT NOT NULL,
                 payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS reading_lists (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                source TEXT NOT NULL,
+                imported_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS reading_list_items (
+                list_id TEXT NOT NULL REFERENCES reading_lists(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                author TEXT,
+                isbn TEXT,
+                PRIMARY KEY (list_id, position)
             );
             """
         )

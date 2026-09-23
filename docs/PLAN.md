@@ -2,6 +2,20 @@
 
 Updated: 2026-09-23
 
+## Current status (2026-09-23)
+
+Phase 1 works for one connected account on macOS and the source CLI has passed
+read-only account/catalog checks. Normal setup now uses official-site browser
+sign-in and a native account cross-check. Standalone packaging, diagnostics,
+and partial-search handling have been repaired and are undergoing smoke tests.
+The public-release gate remains open for clean-machine sign-in, naturally
+expired credentials, multiple cards, and Windows/Linux/Intel platform checks.
+
+Phase 2 has begun as a preview: CSV/text/ISBN import, reviewed direct-file URL
+import, normalization, work/edition grouping, and explicit match states. The
+13-title 2026 Booker example received a result for every entry in the connected
+library, but match quality and absent titles still need independent review.
+
 ## Product direction
 
 `libbyctl` is not a downloader. It is the discovery, planning, and circulation-control layer for a user's Libby libraries. Download workflows such as `odmpy` remain separate downstream tools.
@@ -24,7 +38,7 @@ Acceptance: a tagged release can produce Python artifacts plus macOS ARM64, macO
 
 ## Phase 1 — read-only Libby account + catalog — initial usable release
 
-- guided 8-digit setup-code authentication
+- guided official-site browser authentication, with passkey or setup-code recovery
 - account synchronization
 - linked card discovery
 - Thunder library resolution
@@ -215,23 +229,30 @@ LibbyAccountProvider
 
 No application/planner code should contain endpoint URLs or private protocol payload details.
 
-## v0.1 endpoint assumptions isolated in adapters
+## Private endpoint assumptions isolated in adapters
 
-The current account adapter uses the Libby web service pattern observed in current community clients:
+The native account adapter uses the Libby web service pattern observed in current community clients:
 
-- bootstrap identity chip
-- clone with 8-digit setup code
+- browser-assisted identity import after official-site recovery
+- legacy experimental chip/bootstrap and setup-code clone methods
 - sync account state
 
-The catalog adapter uses the current Thunder v2 library/media/availability surface. These are implementation details, not public contracts, so contract tests and provider isolation are mandatory.
+Direct CLI pairing has not passed a live test and is no longer the normal setup
+path. The catalog adapter uses the current Thunder v2
+library/media/availability surface. These are implementation details, not public
+contracts, so contract tests and provider isolation are mandatory.
 
 ## Immediate next engineering work
 
-1. Test setup-code auth against a real account on macOS.
-2. Capture sanitized fixture shapes for actual sync/card responses.
-3. Validate library-key resolution for every linked card.
-4. Validate search and wait-time fields against Libby UI.
-5. Add cache with 15-minute availability TTL.
-6. Add retry/backoff and token refresh-on-403.
-7. Add GitHub repository URL and Homebrew tap automation.
-8. Begin Phase 2 list/matching work only after the read-only foundation is verified.
+1. Run normal `setup` from a packaged binary on a clean macOS machine with
+   Chrome, then repeat on Windows and Linux; verify the browser driver and
+   credential backend on each platform.
+2. Observe natural token expiry or use a disposable account for revocation;
+   verify reconnect keeps a good credential if interrupted.
+3. Compare availability for the same title, format, edition, and card against
+   the official Libby UI, and test multiple distinct cards.
+4. Review the three unmatched 2026 Booker titles and representative matched
+   editions in the official catalog; adjust scoring before planning relies on it.
+5. Add bounded retry/backoff and a 15-minute availability cache after the
+   provider behavior is validated. Prepare Homebrew distribution only after
+   the clean-machine gate passes.

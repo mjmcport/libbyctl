@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import platform
 import subprocess
@@ -12,30 +13,59 @@ ACCOUNT = "libby-identity-token"
 ENV_TOKEN = "LIBBYCTL_TOKEN"
 
 
+@dataclass(frozen=True, slots=True)
+class SessionCredential:
+    token: str
+    chip_id: str | None = None
+
+
 @dataclass(slots=True)
 class CredentialStore:
-    """Store the Libby identity token without writing it to libbyctl config or SQLite."""
+    """Keep the complete native identity in one OS credential-store item."""
+
+    def get_session(self) -> SessionCredential | None:
+        if (override := os.getenv(ENV_TOKEN)) is not None:
+            return SessionCredential(override.strip()) if override.strip() else None
+
+        if platform.system() == "Darwin":
+            value = self._macos_get()
+        else:
+            try:
+                import keyring  # type: ignore
+            except ImportError:
+                return None
+            value = keyring.get_password(SERVICE, ACCOUNT)
+        if not value:
+            return None
+        try:
+            record = json.loads(value)
+        except json.JSONDecodeError:
+            return SessionCredential(value)  # Existing v0.1 token item.
+        if not isinstance(record, dict) or record.get("version") != 1:
+            raise CredentialStoreError("Unsupported saved Libby credential. Reconnect with setup.")
+        token = record.get("token")
+        chip_id = record.get("chip_id")
+        if not isinstance(token, str) or not token.strip():
+            raise CredentialStoreError("Saved Libby credential is invalid. Reconnect with setup.")
+        if chip_id is not None and not isinstance(chip_id, str):
+            raise CredentialStoreError("Saved Libby credential is invalid. Reconnect with setup.")
+        return SessionCredential(token, chip_id)
 
     def get_token(self) -> str | None:
-        if token := os.getenv(ENV_TOKEN):
-            return token.strip() or None
-
-        if platform.system() == "Darwin":
-            return self._macos_get()
-
-        try:
-            import keyring  # type: ignore
-        except ImportError:
-            return None
-        return keyring.get_password(SERVICE, ACCOUNT)
+        session = self.get_session()
+        return session.token if session else None
 
     def set_token(self, token: str) -> None:
-        token = token.strip()
+        self.set_session(SessionCredential(token))
+
+    def set_session(self, session: SessionCredential) -> None:
+        token = session.token.strip()
         if not token:
             raise CredentialStoreError("Refusing to store an empty token.")
+        value = json.dumps({"version": 1, "token": token, "chip_id": session.chip_id})
 
         if platform.system() == "Darwin":
-            self._macos_set(token)
+            self._macos_set(value)
             return
 
         try:
@@ -45,7 +75,7 @@ class CredentialStore:
                 "No supported OS credential backend is available. "
                 "Install keyring or use LIBBYCTL_TOKEN."
             ) from exc
-        keyring.set_password(SERVICE, ACCOUNT, token)
+        keyring.set_password(SERVICE, ACCOUNT, value)
 
     def delete_token(self) -> None:
         if platform.system() == "Darwin":

@@ -1,16 +1,20 @@
 # Build with: pyinstaller packaging/pyinstaller/libbyctl.spec
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_submodules
 
+ROOT = Path(SPECPATH).resolve().parents[1]
 hiddenimports = []
 try:
     hiddenimports.extend(collect_submodules("keyring.backends"))
 except Exception:
     # macOS uses the native `security` CLI and intentionally has no keyring dependency.
     pass
+hiddenimports.extend(collect_submodules("playwright"))
 
 a = Analysis(
-    ["src/libbyctl/__main__.py"],
-    pathex=["src"],
+    [str(ROOT / "src/libbyctl/__main__.py")],
+    pathex=[str(ROOT / "src")],
     binaries=[],
     datas=[],
     hiddenimports=hiddenimports,

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-import time
+import shutil
+from enum import StrEnum
 from typing import Annotated
 
 import typer
@@ -10,31 +11,48 @@ from rich.panel import Panel
 from rich.table import Table
 
 from libbyctl import __version__
-from libbyctl.config.credentials import CredentialStore
+from libbyctl.cli.lists import app as lists_app
+from libbyctl.config.credentials import CredentialStore, SessionCredential
 from libbyctl.config.settings import Settings
+from libbyctl.domain.models import Card
 from libbyctl.exceptions import LibbyCtlError
 from libbyctl.output.render import cards_table, search_table
 from libbyctl.providers.catalog.thunder import ThunderCatalogProvider
+from libbyctl.providers.libby.browser import browser_runtime_ok
 from libbyctl.providers.libby.client import LibbyClient
-from libbyctl.services.account import cards_from_sync, website_ids_from_sync
+from libbyctl.services.account import (
+    cards_from_sync,
+    require_resolved_libraries,
+    website_ids_from_sync,
+)
 from libbyctl.services.search import search_libraries
 from libbyctl.storage.database import database_ok, initialize_database
 
 console = Console()
+error_console = Console(stderr=True)
 app = typer.Typer(
     no_args_is_help=True,
     help="Search and plan Libby access across all your library cards.",
 )
 auth_app = typer.Typer(help="Connect and manage your Libby identity.")
 app.add_typer(auth_app, name="auth")
+app.add_typer(lists_app, name="lists")
+
+
+class SearchFormat(StrEnum):
+    ebook = "ebook"
+    audiobook = "audiobook"
 
 
 def main() -> None:
     try:
         app()
     except LibbyCtlError as exc:
-        console.print(f"[bold red]Error:[/bold red] {exc}")
+        error_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise SystemExit(2) from None
+    except KeyboardInterrupt:
+        console.print("\nSign-in cancelled. Existing credentials were kept.")
+        raise SystemExit(130) from None
 
 
 def _clients(
@@ -53,12 +71,15 @@ def _clients(
 def _load_account() -> tuple[Settings, CredentialStore, LibbyClient, ThunderCatalogProvider, dict]:
     settings = Settings.load()
     store = CredentialStore()
-    token = store.get_token()
-    if not token:
+    session = store.get_session()
+    if not session:
         raise LibbyCtlError("Libby is not connected. Run: libbyctl setup")
-    libby, thunder = _clients(settings, token)
+    libby, thunder = _clients(settings, session.token)
+    libby.chip_id = session.chip_id
     try:
         sync = libby.sync()
+        if libby.token != session.token and libby.token:
+            store.set_session(SessionCredential(libby.token, libby.chip_id))
     except Exception:
         libby.close()
         thunder.close()
@@ -73,51 +94,55 @@ def version() -> None:
 
 
 @app.command()
-def setup() -> None:
-    """Interactive first-run setup."""
+def setup(
+    timeout: Annotated[int, typer.Option(min=30, max=1800)] = 600,
+) -> None:
+    """Connect through the official Libby website in a dedicated Chrome profile."""
     settings = Settings.load()
-    store = CredentialStore()
     console.print(
         Panel.fit(
             "[bold]Welcome to libbyctl[/bold]\n"
             "Connect Libby, discover cards, and verify catalog access."
         )
     )
-    console.print(
-        "\nOn the Libby device that already has your cards, open "
-        "[bold]Menu → Copy To Another Device[/bold]. Enter the current code shown here."
-    )
-
-    def show_pairing_code(code: str, expiry: float) -> None:
-        remaining = max(0, round(expiry - time.time()))
-        console.print(
-            Panel.fit(
-                f"[bold cyan]{code}[/bold cyan]\nExpires in about {remaining} seconds. "
-                "The code refreshes automatically.",
-                title="Enter this code on your existing Libby device",
-            )
-        )
-
-    libby, thunder = _clients(settings)
-    try:
-        sync = libby.login_with_device_pairing(show_pairing_code)
-        assert libby.token
-        store.set_token(libby.token)
-        website_ids = website_ids_from_sync(sync)
-        libraries = thunder.libraries_by_website_ids(website_ids)
-        cards = cards_from_sync(sync, libraries)
-    finally:
-        libby.close()
-        thunder.close()
+    console.print("Complete Libby sign-in in the Chrome window that opens.")
+    cards = _connect_native_browser(settings, timeout=timeout)
     settings.save()
     initialize_database(settings.database_path)
     console.print(
         f"\n[green]✓[/green] Libby connected\n"
         f"[green]✓[/green] {len(cards)} card(s) discovered"
     )
-    if cards:
-        cards_table(cards)
+    cards_table(cards)
     console.print("[green]✓[/green] Configuration and local database initialized")
+
+
+def _connect_native_browser(settings: Settings, *, timeout: int = 600) -> list[Card]:
+    from libbyctl.providers.libby.browser import connect_browser
+
+    if settings.libby_base_url.rstrip("/") != "https://sentry.libbyapp.com":
+        raise LibbyCtlError("Browser sign-in requires the official Libby provider URL.")
+    session = connect_browser(
+        settings.data_dir / "browser-profile", timeout=timeout, notify=console.print,
+    )
+    console.print("Verifying this account through a read-only native request…")
+    libby, thunder = _clients(settings, session.token)
+    try:
+        sync = libby.sync()
+        card_ids = frozenset(str(card.get("cardId", "")) for card in sync.get("cards", []))
+        if not card_ids or card_ids != session.card_ids:
+            raise LibbyCtlError("Native account did not match the browser cards; credentials kept.")
+        website_ids = website_ids_from_sync(sync)
+        libraries = thunder.libraries_by_website_ids(website_ids)
+        require_resolved_libraries(website_ids, libraries)
+        cards = cards_from_sync(sync, libraries)
+        if not cards:
+            raise LibbyCtlError("Account libraries did not resolve; credentials kept.")
+        CredentialStore().set_session(SessionCredential(session.token))
+        return cards
+    finally:
+        libby.close()
+        thunder.close()
 
 
 @auth_app.command("status")
@@ -125,7 +150,10 @@ def auth_status() -> None:
     """Check whether the stored Libby identity still works."""
     settings, _, libby, thunder, sync = _load_account()
     try:
-        cards = cards_from_sync(sync, thunder.libraries_by_website_ids(website_ids_from_sync(sync)))
+        websites = website_ids_from_sync(sync)
+        libraries = thunder.libraries_by_website_ids(websites)
+        require_resolved_libraries(websites, libraries)
+        cards = cards_from_sync(sync, libraries)
     finally:
         libby.close()
         thunder.close()
@@ -140,10 +168,20 @@ def auth_browser(
         bool, typer.Option(help="Test one native account read and save the token only on success.")
     ] = False,
     timeout: Annotated[int, typer.Option(min=30, max=1800)] = 600,
+    check_runtime: Annotated[
+        bool, typer.Option(help="Check the bundled browser driver without opening Chrome.")
+    ] = False,
 ) -> None:
     """Sign in on the official Libby website in a dedicated Chrome profile (prototype)."""
     from libbyctl.providers.libby.browser import connect_browser
 
+    if check_runtime:
+        if not browser_runtime_ok():
+            raise LibbyCtlError(
+                "Browser runtime is unavailable. Reinstall libbyctl with browser support."
+            )
+        console.print("Browser runtime ready.")
+        return
     settings = Settings.load()
     if test_native and settings.libby_base_url.rstrip("/") != "https://sentry.libbyapp.com":
         raise LibbyCtlError(
@@ -177,9 +215,14 @@ def auth_browser(
 
 @auth_app.command("logout")
 def auth_logout() -> None:
-    """Delete the stored Libby identity token."""
+    """Remove the native identity and the dedicated browser sign-in profile."""
+    profile = Settings.load().data_dir / "browser-profile"
+    if profile.is_symlink():
+        raise LibbyCtlError("Browser profile is a symbolic link; remove it manually.")
     CredentialStore().delete_token()
-    console.print("Libby credentials removed from the OS credential store.")
+    if profile.exists():
+        shutil.rmtree(profile)
+    console.print("Libby identity and dedicated browser profile removed from this computer.")
 
 
 @auth_app.command("token")
@@ -202,7 +245,9 @@ def cards(
     """Show linked library cards and current loan/hold counts."""
     _, _, libby, thunder, sync = _load_account()
     try:
-        libraries = thunder.libraries_by_website_ids(website_ids_from_sync(sync))
+        website_ids = website_ids_from_sync(sync)
+        libraries = thunder.libraries_by_website_ids(website_ids)
+        require_resolved_libraries(website_ids, libraries)
         values = cards_from_sync(sync, libraries)
     finally:
         libby.close()
@@ -224,7 +269,9 @@ def search(
     author: Annotated[
         str | None, typer.Option("--author", "-a", help="Creator/author filter")
     ] = None,
-    media_type: Annotated[str | None, typer.Option("--format", help="ebook or audiobook")] = None,
+    media_type: Annotated[
+        SearchFormat | None, typer.Option("--format", help="ebook or audiobook")
+    ] = None,
     library: Annotated[
         list[str] | None,
         typer.Option("--library", help="Limit to a library key; repeatable"),
@@ -237,28 +284,45 @@ def search(
     """Search every linked library and compare availability."""
     settings, _, libby, thunder, sync = _load_account()
     try:
-        libraries = thunder.libraries_by_website_ids(website_ids_from_sync(sync))
+        websites = website_ids_from_sync(sync)
+        libraries = thunder.libraries_by_website_ids(websites)
+        require_resolved_libraries(websites, libraries)
         if library:
             wanted = {x.lower() for x in library}
+            known = {lib.key.lower() for lib in libraries}
+            unknown = wanted - known
+            if unknown:
+                choices = ", ".join(sorted(lib.key for lib in libraries)) or "none"
+                raise LibbyCtlError(
+                    f"Unknown library key(s): {', '.join(sorted(unknown))}. "
+                    f"Available keys: {choices}."
+                )
             libraries = [lib for lib in libraries if lib.key.lower() in wanted]
-        results = search_libraries(
+        if not libraries:
+            raise LibbyCtlError("No linked libraries resolved for search. Run libbyctl doctor.")
+        report = search_libraries(
             thunder,
             libraries,
             query,
             creator=author,
-            media_type=media_type,
+            media_type=media_type.value if media_type else None,
             max_concurrency=settings.max_concurrency,
             per_library=per_library,
         )
     finally:
         libby.close()
         thunder.close()
+    if sum(warning.stage == "search" for warning in report.warnings) == len(libraries):
+        raise LibbyCtlError("All selected library searches failed. Please retry later.")
     if json_output:
-        typer.echo(json.dumps([x.model_dump(mode="json") for x in results], indent=2))
-    elif not results:
+        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2))
+    elif not report.results:
         console.print("No matching titles found across the selected libraries.")
     else:
-        search_table(results)
+        search_table(report.results)
+    if report.warnings and not json_output:
+        for warning in report.warnings:
+            console.print(f"[yellow]Warning:[/yellow] {warning.library_key}: {warning.message}")
 
 
 @app.command()
@@ -269,29 +333,44 @@ def doctor() -> None:
     table = Table(title="libbyctl diagnostics")
     table.add_column("Check")
     table.add_column("Status")
+    failed = False
     table.add_row("Application", f"✓ {__version__}")
     table.add_row("Configuration", f"✓ {settings.config_path}")
-    table.add_row("Database", "✓" if database_ok(settings.database_path) else "✗")
-    token = store.get_token()
-    table.add_row("Credential store", "✓ token found" if token else "✗ not connected")
-    if token:
-        libby, thunder = _clients(settings, token)
+    runtime_ready = browser_runtime_ok()
+    table.add_row("Browser runtime", "✓" if runtime_ready else "✗ unavailable")
+    failed |= not runtime_ready
+    database_ready = database_ok(settings.database_path)
+    table.add_row("Database", "✓" if database_ready else "✗")
+    failed |= not database_ready
+    session = store.get_session()
+    table.add_row("Credential store", "✓ token found" if session else "✗ not connected")
+    failed |= session is None
+    if session:
+        libby, thunder = _clients(settings, session.token)
+        libby.chip_id = session.chip_id
         try:
             sync = libby.sync()
+            if libby.token != session.token and libby.token:
+                store.set_session(SessionCredential(libby.token, libby.chip_id))
             cards = cards_from_sync(sync)
             table.add_row("Libby authentication", f"✓ {len(cards)} card(s)")
             try:
                 websites = website_ids_from_sync(sync)
                 libs = thunder.libraries_by_website_ids(websites)
+                require_resolved_libraries(websites, libs)
                 table.add_row("Catalog service", f"✓ {len(libs)} library/libraries resolved")
             except Exception as exc:
                 table.add_row("Catalog service", f"✗ {exc}")
+                failed = True
         except Exception as exc:
             table.add_row("Libby authentication", f"✗ {exc}")
+            failed = True
         finally:
             libby.close()
             thunder.close()
     console.print(table)
+    if failed:
+        raise typer.Exit(2)
 
 
 @app.command("init")

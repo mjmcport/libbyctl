@@ -29,4 +29,6 @@ def test_main_reports_cli_errors_without_traceback(monkeypatch, capsys):
         cli.app.main()
 
     assert result.value.code == 2
-    assert "Libby is not connected" in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert "Libby is not connected" in captured.err
+    assert captured.out == ""

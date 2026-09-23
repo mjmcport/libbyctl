@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -44,6 +45,16 @@ def session_from_sync(
     return BrowserSession(token, frozenset(ids))
 
 
+def browser_runtime_ok() -> bool:
+    """Verify the packaged Playwright driver starts without opening a browser."""
+    try:
+        api = importlib.import_module("playwright.sync_api")
+        with api.sync_playwright():
+            return True
+    except Exception:
+        return False
+
+
 def connect_browser(
     profile: Path,
     *,
@@ -53,8 +64,13 @@ def connect_browser(
     try:
         api = importlib.import_module("playwright.sync_api")
     except ImportError:
+        guidance = (
+            "Reinstall the complete libbyctl release."
+            if getattr(sys, "frozen", False)
+            else "Install browser support with: uv tool install 'libbyctl[browser]'"
+        )
         raise AuthenticationError(
-            "Browser support is not installed. Run: uv sync --extra browser"
+            f"Browser support is not installed. {guidance}"
         ) from None
 
     profile.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -96,7 +112,14 @@ def connect_browser(
                     raise AuthenticationError(
                         "Browser closed before account verification completed."
                     )
-                page.wait_for_timeout(250)
+                try:
+                    page.wait_for_timeout(250)
+                except Exception:
+                    if page.is_closed():
+                        raise AuthenticationError(
+                            "Browser closed before account verification completed."
+                        ) from None
+                    raise
             raise AuthenticationError(
                 "Timed out waiting for synchronized library cards. "
                 "Run libbyctl auth browser to resume this browser profile."

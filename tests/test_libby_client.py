@@ -28,8 +28,8 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
                 assert request.url.params["v"] == "abcdef12"
                 return httpx.Response(200, json={"chip": chip_id, "identity": "refreshed-token"})
             assert chip_count == 3
-            assert "authorization" not in request.headers
-            assert request.url.params["r"] == chip_id
+            assert request.headers["authorization"] == "Bearer refreshed-token"
+            assert request.url.params["v"] == "abcdef12"
             return httpx.Response(
                 200, json={"chip": chip_id, "identity": "recovered-token"}
             )
@@ -100,11 +100,9 @@ def test_private_api_notice_stops_without_retry_or_echoing_secrets():
         "https://example.test", token="secret-token", transport=httpx.MockTransport(handler)
     ) as client:
         client.chip_id = "existing-chip"
-        with pytest.raises(
-            AuthenticationError, match="CLI account setup is currently blocked"
-        ) as exc:
+        with pytest.raises(AuthenticationError, match="Run libbyctl setup") as exc:
             client._request("POST", "chip/clone", json={"blessing": "test-grant"})
-        assert len(requests) == 1
+        assert [request.url.path for request in requests] == ["/chip/clone", "/chip"]
         assert client.token == "secret-token"
         assert "12345678" not in str(exc.value)
         assert "secret-token" not in str(exc.value)
