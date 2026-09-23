@@ -163,3 +163,43 @@ def test_structured_borrow_limit_is_reported_and_not_retried(tmp_path):
         with pytest.raises(LibbyCtlError, match="rejected"):
             execute(audit, provider, intent, confirmed=True)
         assert len(writes) == 1
+
+
+def test_private_provider_uses_live_suspension_flag_for_resume(tmp_path):
+    suspended = False
+
+    def libby_handler(request):
+        nonlocal suspended
+        if request.url.path == "/chip/sync":
+            return httpx.Response(200, json={
+                "result": "synchronized",
+                "cards": [{"cardId": "card", "library": {"websiteId": 5},
+                           "limits": {"hold": 5}, "counts": {"hold": 1}}],
+                "loans": [],
+                "holds": [{"id": "title", "cardId": "card", "suspensionFlag": suspended}],
+            })
+        suspended = json.loads(request.content)["days_to_suspend"] > 0
+        return httpx.Response(200, json={})
+
+    def catalog_handler(request):
+        if request.url.path.endswith("/availability"):
+            return httpx.Response(200, json={"isAvailable": False, "ownedCopies": 2})
+        return httpx.Response(200, json={"items": [{"websiteId": 5, "preferredKey": "lib"}]})
+
+    with (
+        LibbyClient("https://example.test", token="token",
+                    transport=httpx.MockTransport(libby_handler)) as libby,
+        ThunderCatalogProvider("https://catalog.test", transport=httpx.MockTransport(
+            catalog_handler)) as catalog,
+    ):
+        provider = LibbyCirculationProvider(
+            libby, catalog, [CirculationTarget("card", "title", "lib", "ebook")]
+        )
+        suspend = CirculationIntent("suspend", CirculationAction.SUSPEND_HOLD,
+                                    "card", "title", suspension_days=7)
+        resume = CirculationIntent("resume", CirculationAction.RESUME_HOLD,
+                                   "card", "title")
+        assert execute(tmp_path / "audit.db", provider, suspend, confirmed=True) == "applied"
+        assert provider.snapshot().suspended_holds == {("card", "title")}
+        assert execute(tmp_path / "audit.db", provider, resume, confirmed=True) == "applied"
+        assert provider.snapshot().suspended_holds == set()

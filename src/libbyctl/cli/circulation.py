@@ -66,7 +66,7 @@ def candidates(
 
 def _change(
     action: CirculationAction, title_id: str, operation_id: str, card_number: int,
-    expected_format: Format | None, yes: bool,
+    expected_format: Format | None, yes: bool, suspension_days: int | None = None,
 ) -> None:
     from libbyctl.cli.app import _load_account
 
@@ -95,6 +95,7 @@ def _change(
         provider = LibbyCirculationProvider(libby, catalog, [target])
         intent = CirculationIntent(
             operation_id, action, card.id, title_id, media_type=item.media_type,
+            suspension_days=suspension_days,
         )
         result = execute(settings.database_path, provider, intent, confirmed=True)
         state = provider.snapshot()
@@ -104,6 +105,10 @@ def _change(
             visible = key not in state.loans
         elif action == CirculationAction.CANCEL_HOLD:
             visible = key not in state.holds
+        elif action == CirculationAction.SUSPEND_HOLD:
+            visible = key in state.suspended_holds
+        elif action == CirculationAction.RESUME_HOLD:
+            visible = key in state.holds and key not in state.suspended_holds
         if not visible:
             raise LibbyCtlError(
                 "Libby accepted the request, but the account state has not confirmed it. "
@@ -159,3 +164,26 @@ def cancel_hold(
 ) -> None:
     """Cancel one exact hold and verify it disappeared from the account."""
     _change(CirculationAction.CANCEL_HOLD, title_id, operation_id, card, None, yes)
+
+
+@app.command("suspend-hold")
+def suspend_hold(
+    title_id: Annotated[str, typer.Argument(help="Exact held title ID")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    days: Annotated[int, typer.Option(min=1, max=30, help="Days to delay delivery")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Pause a hold and verify its suspended state."""
+    _change(CirculationAction.SUSPEND_HOLD, title_id, operation_id, card, None, yes, days)
+
+
+@app.command("resume-hold")
+def resume_hold(
+    title_id: Annotated[str, typer.Argument(help="Exact held title ID")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Resume a suspended hold and verify it is active."""
+    _change(CirculationAction.RESUME_HOLD, title_id, operation_id, card, None, yes)

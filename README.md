@@ -3,7 +3,7 @@
 `libbyctl` helps you search the catalogs connected to your Libby account and
 compare ebook and audiobook availability. It can import reading lists, make
 read-only loan/hold plans, and compare sourced candidate libraries. Explicit
-single-title borrow, hold, return, and hold cancellation are available through
+single-title borrow, hold, return, and hold management are available through
 the connected Libby account. Bulk account changes are not exposed yet.
 
 This is an unofficial alpha. It uses interfaces that can change, and it is not
@@ -111,6 +111,8 @@ libbyctl circulation candidates 'Pride and Prejudice' --format ebook --author 'J
 libbyctl circulation borrow TITLE_ID --format ebook --operation-id my-borrow-1
 libbyctl circulation return TITLE_ID --operation-id my-return-1
 libbyctl circulation hold TITLE_ID --format ebook --operation-id my-hold-1
+libbyctl circulation suspend-hold TITLE_ID --days 7 --operation-id my-suspend-1
+libbyctl circulation resume-hold TITLE_ID --operation-id my-resume-1
 libbyctl circulation cancel-hold TITLE_ID --operation-id my-cancel-1
 ```
 
@@ -121,7 +123,8 @@ Use a new operation ID only for a distinct action after resolving a structured
 rejection. The private Libby service is undocumented; library account rules can
 refuse an otherwise available title. In the September 2026 live test, borrow
 requests were refused with `PatronExceededChurningLimit`, while a temporary hold
-was placed and canceled successfully. No test loan or hold remained afterward.
+was placed, suspended, resumed, and canceled successfully. No test loan or hold
+remained afterward.
 
 ## Candidate libraries
 
@@ -145,8 +148,8 @@ are research leads: a matching area does not establish membership eligibility
 or personalized borrowing access.
 
 The circulation engine keeps an audit record without credentials or title/card
-IDs. Renew and hold suspension have private-client methods but are not exposed
-as CLI commands until their account-state checks are verified. See
+IDs. Renewal has a private-client method but is not exposed as a CLI command
+until its account-state checks are verified. See
 [`docs/PHASE3_TO_PHASE8_PROGRESS.md`](docs/PHASE3_TO_PHASE8_PROGRESS.md).
 
 ## Local integrations

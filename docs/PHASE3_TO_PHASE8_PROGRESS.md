@@ -13,7 +13,7 @@ the card's current limits; proposals are not proof of patron-specific access.
 
 The remaining phases are partially built. The circulation safety engine and
 bulk restart logic passed simulated tests. A private Libby adapter now supports
-explicit single-title borrow, hold, return, and hold cancellation. Research found
+explicit single-title borrow, hold, return, and hold management. Research found
 that a regular Libby device identity can make circulation requests through
 Libby's private service; see `docs/PRIVATE_CIRCULATION_RESEARCH.md`.
 The scout and optimizer work with reviewed registry
@@ -26,7 +26,7 @@ surface is read-only. No automatic circulation or download trigger is exposed.
 | Phase | Work | Evidence | Open gate |
 | --- | --- | --- | --- |
 | 3 | Saved plans, refresh history, loans/holds, availability by linked card, known limits, preferred formats, duplicate avoidance, explicit reasons | Synthetic capacity/error/duplicate tests and live 13-item create/refresh | Second distinct card, official UI edition/availability parity, clean-machine packaging |
-| 4 | Provider-neutral engine, private Libby adapter, and CLI borrow/hold/return/cancel-hold; confirmation, preflight, hashed audit key | Mock request contracts and state transitions; live Pride and Prejudice ebook hold placed and canceled; borrow requests refused by account activity limit | Retry live borrow after the account limit clears; verify renew and hold suspension mapping before exposing those commands |
+| 4 | Provider-neutral engine, private Libby adapter, and CLI borrow/hold/return/suspend/resume/cancel; confirmation, preflight, hashed audit key | Mock request contracts and state transitions; live Pride and Prejudice ebook hold placed, suspended, resumed, and canceled; borrow requests refused by account activity limit | Retry live borrow after the account limit clears; verify renewal mapping before exposing that command |
 | 5 | Plan comparison before apply, per-action durable status, safe restart after a partial response failure | Simulated two-action batch: borrow succeeded, hold response lost, retry reconciled without a second write | Real provider state mapping and a controlled account test |
 | 6 | Local registry import with eligibility text, fee/term, Libby/online flags, official HTTPS source, verification date; public-catalog scout | Validation, persistence, CLI import/list, synthetic catalog comparison | Verified regional records and official join conditions |
 | 7 | Marginal coverage, immediate availability, shorter waits, preferred-format coverage, fee, and source age shown separately | Synthetic comparison and deterministic ordering | Real library examples and human review of cost/wait claims |
@@ -50,7 +50,8 @@ approved OverDrive API credential. However, other projects use a regular Libby
 identity for borrow/hold/return through Libby's separate private service. That
 route does not require an OverDrive developer account. It is undocumented and
 can change or reject a particular identity. This account was tested with a
-temporary Pride and Prejudice ebook hold and cancellation; both succeeded.
+temporary Pride and Prejudice ebook hold, suspension, resumption, and cancellation;
+all succeeded.
 The ebook and audiobook borrow attempts were refused with
 `PatronExceededChurningLimit`, so successful live borrowing remains unverified.
 The account was checked afterward: neither test loan nor temporary hold remained.
@@ -63,8 +64,8 @@ and timestamp; it stores no credential, email, card ID, or title ID.
    chosen Pride and Prejudice ebook borrow and one audiobook borrow, verify each
    in account state, then return both as requested. Test a non-JSON successful
    return response and reconcile any uncertain outcome with the same operation
-   ID. Validate renewal and hold suspension fields before exposing their CLI
-   commands. Keep the approved OverDrive API as a separate provider option.
+   ID. Validate renewal fields before exposing its CLI command. Keep the
+   approved OverDrive API as a separate provider option.
 2. Supply an eligibility area. Research candidate libraries against their
    official membership and Libby pages, record fee and verification date, then
    compare scout results with the official catalog/UI before recommending a card.

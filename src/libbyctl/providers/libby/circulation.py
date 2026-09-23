@@ -53,7 +53,7 @@ class LibbyCirculationProvider:
             if key:
                 state.holds.add(key)
                 suspension = raw.get("daysToSuspend")
-                if raw.get("isSuspended") is True or (
+                if raw.get("suspensionFlag") is True or raw.get("isSuspended") is True or (
                     isinstance(suspension, (int, float)) and suspension > 0
                 ):
                     state.suspended_holds.add(key)
