@@ -12,8 +12,10 @@ warnings. There were no account writes. This reflects one catalog snapshot and
 the card's current limits; proposals are not proof of patron-specific access.
 
 The remaining phases are partially built. The circulation safety engine and
-bulk restart logic passed simulated tests, but no approved live circulation
-provider is configured. The scout and optimizer work with reviewed registry
+bulk restart logic passed simulated tests, but no live circulation adapter is
+configured. Research found that a regular Libby device identity can make
+circulation requests through Libby's private service; see
+`docs/PRIVATE_CIRCULATION_RESEARCH.md`. The scout and optimizer work with reviewed registry
 records, but no actual membership record is bundled because eligibility and fee
 claims need location-specific official verification. The first integration
 surface is read-only. No automatic circulation or download trigger is exposed.
@@ -23,8 +25,8 @@ surface is read-only. No automatic circulation or download trigger is exposed.
 | Phase | Work | Evidence | Open gate |
 | --- | --- | --- | --- |
 | 3 | Saved plans, refresh history, loans/holds, availability by linked card, known limits, preferred formats, duplicate avoidance, explicit reasons | Synthetic capacity/error/duplicate tests and live 13-item create/refresh | Second distinct card, official UI edition/availability parity, clean-machine packaging |
-| 4 | Provider-neutral single-item engine for borrow, hold, cancel/suspend/resume hold, renew, return; confirmation, preflight, hashed audit key | Simulated success, unknown-capacity rejection, lost-response reconciliation, absence checks | Approved circulation credentials/provider; live calls not attempted |
-| 5 | Plan comparison before apply, per-action durable status, safe restart after a partial response failure | Simulated two-action batch: borrow succeeded, hold response lost, retry reconciled without a second write | Real provider state mapping and disposable integration account |
+| 4 | Provider-neutral single-item engine for borrow, hold, cancel/suspend/resume hold, renew, return; confirmation, preflight, hashed audit key | Simulated success, unknown-capacity rejection, lost-response reconciliation, absence checks | Private Libby write adapter, contract tests, and a controlled live check; live calls not attempted |
+| 5 | Plan comparison before apply, per-action durable status, safe restart after a partial response failure | Simulated two-action batch: borrow succeeded, hold response lost, retry reconciled without a second write | Real provider state mapping and a controlled account test |
 | 6 | Local registry import with eligibility text, fee/term, Libby/online flags, official HTTPS source, verification date; public-catalog scout | Validation, persistence, CLI import/list, synthetic catalog comparison | Verified regional records and official join conditions |
 | 7 | Marginal coverage, immediate availability, shorter waits, preferred-format coverage, fee, and source age shown separately | Synthetic comparison and deterministic ordering | Real library examples and human review of cost/wait claims |
 | 8 | Versioned aggregate `plans summary --json`; optional MCP stdio server exposing read-only local summaries and candidate records | CLI privacy test and in-process MCP client test with official SDK 2.2 | Stable CLI contract, authenticated local HTTP API, Home Assistant configuration, optional `odmpy` handoff |
@@ -34,7 +36,7 @@ the optional `mcp` extra; installations without that extra still run the main CL
 The live check printed only aggregate action counts. Its temporary database was
 removed on exit. No token, card ID, library key, or borrowed title was committed.
 
-## Why circulation is gated
+## Circulation access and remaining gate
 
 OverDrive documents borrow/return through its
 [Checkouts API](https://developer.overdrive.com/api-docs/circulation-apis/checkouts)
@@ -43,19 +45,25 @@ and hold actions through its
 Those calls use an OAuth patron access token and approved API access;
 [access requests](https://developer.overdrive.com/request-access) are tied to
 partner-affiliated organizations. The current Libby browser identity is not an
-approved OverDrive API credential. The official examples also do not establish
-how to map this project's Libby card IDs to an authorized patron API identity.
-For that reason the new engine has no production write adapter or live write CLI.
+approved OverDrive API credential. However, other projects use a regular Libby
+identity for borrow/hold/return through Libby's separate private service. That
+route does not require an OverDrive developer account. It is undocumented and
+can change or reject a particular identity; current write compatibility for
+this account has not been tested. The engine has no production write adapter or
+live write CLI yet because the request contract, card/format mapping, and
+response reconciliation still need implementation and verification.
 The audit ledger is local and stores only a hashed operation key, action, status,
 and timestamp; it stores no credential, email, card ID, or title ID.
 
 ## Next test session
 
-1. Use a disposable authorized OverDrive integration account and approved API
-   access to implement/test the official adapter. Verify exact card and title
-   mapping, borrow/hold/return behavior, and renew support from approved docs.
-   Exercise an ambiguous match, capacity change, response loss, and partial
-   batch restart. Do not use the ordinary connected Libby account for trial writes.
+1. Implement a private Libby circulation adapter behind the existing write
+   boundary. Test request paths, method/body, account-state mapping, chip refresh,
+   and error handling with mock transport. Then use a controlled, explicitly
+   chosen borrow or hold on the connected account, with confirmation and a fresh
+   state check. Verify the result in Libby and exercise ambiguous matches,
+   capacity changes, response loss, and partial batch restart using simulations.
+   Keep the approved OverDrive API as a separate provider option.
 2. Supply an eligibility area. Research candidate libraries against their
    official membership and Libby pages, record fee and verification date, then
    compare scout results with the official catalog/UI before recommending a card.
