@@ -2,6 +2,19 @@
 
 Research date: 2026-09-23. Repository reviewed: `07603a3827701540ce39d8572dd822da771577cb` on `codex/libby-device-pairing`.
 
+## Subsequent prototype result — 2026-09-23
+
+The user completed official sign-in in the dedicated browser profile. The
+prototype then verified one synchronized card across a browser restart. A native
+read returned the same account; its token was saved in the OS credential store.
+Separate CLI processes successfully ran `auth status`, `cards --json` (one card),
+and `search "The Hobbit" --json --per-library 1` (one result). No credential or
+account identifiers are included here. This validates browser-assisted login and
+current token portability for this account, not long-term renewal or multiple
+libraries. The initial response-event handler stalled; queueing responses and
+reading their bodies outside the event callback resolved the observed stall.
+The research and proposed acceptance gates below remain the historical plan.
+
 ## Recommendation
 
 Build a browser-assisted authentication proof of concept before changing the private pairing protocol again. Complete recovery through Libby's official page in a dedicated, persistent browser profile, verify actual cards, and then make a controlled distinction between two possible providers:

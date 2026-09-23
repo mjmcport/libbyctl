@@ -61,31 +61,37 @@ def connect_browser(
     profile.chmod(0o700)
 
     def wait_for_account(context: Any, page: Any, deadline: float) -> BrowserSession:
-        captured: list[BrowserSession] = []
+        pending: list[Any] = []
 
         def on_response(response: Any) -> None:
             # Filter before reading either headers or JSON from the browser.
-            if response.url != "https://sentry.libbyapp.com/chip/sync":
-                return
-            try:
-                session = session_from_sync(
-                    response.url,
-                    response.status,
-                    response.json(),
-                    response.request.header_value("authorization") or "",
-                )
-                if session:
-                    captured[:] = [session]
-            except Exception:
-                # Incomplete/failed responses are not evidence of a connected account.
-                return
+            parsed = urlsplit(response.url)
+            if (
+                parsed.scheme == "https"
+                and parsed.netloc == "sentry.libbyapp.com"
+                and parsed.path == "/chip/sync"
+            ):
+                # Do not make synchronous Playwright calls inside an event callback.
+                # The response body may still be arriving when this event fires.
+                pending.append(response)
 
         context.on("response", on_response)
         try:
             page.goto("https://libbyapp.com", wait_until="domcontentloaded", timeout=60000)
             while time.monotonic() < deadline:
-                if captured:
-                    return captured[-1]
+                while pending:
+                    response = pending.pop(0)
+                    try:
+                        session = session_from_sync(
+                            response.url,
+                            response.status,
+                            response.json(),
+                            response.request.header_value("authorization") or "",
+                        )
+                    except Exception:
+                        continue
+                    if session:
+                        return session
                 if page.is_closed():
                     raise AuthenticationError(
                         "Browser closed before account verification completed."

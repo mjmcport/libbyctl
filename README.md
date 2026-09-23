@@ -10,12 +10,15 @@ The project starts read-only: connect Libby, discover your cards, search all lin
 
 ## Quick start
 
-**Account setup is currently blocked (2026-09-23).** Live device transfers fail
+**Direct CLI pairing is currently blocked (2026-09-23).** Live device transfers fail
 at `chip/clone` with HTTP 403 and `missing_chip`; the server also returns a notice
 restricting its private API to the official Libby client. Automated pairing tests
 use mocks and do not demonstrate working live sign-in. The setup commands below
 are experimental; repeated pairing attempts are not a verified remedy. Use the
 [official Libby website](https://libbyapp.com) or app to access your account.
+The browser sign-in prototype below has now passed a real-account test: browser
+restart, native account synchronization, fresh-process card listing, and catalog
+search. Long-term credential renewal is still unverified.
 
 ### macOS — current developer build
 

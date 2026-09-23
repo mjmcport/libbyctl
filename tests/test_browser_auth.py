@@ -107,14 +107,21 @@ def test_browser_restarts_same_profile_and_checks_account(monkeypatch, tmp_path,
             assert listener is self.listener
 
         def goto(self, *args, **kwargs):
+            self.in_callback = True
+
+            def read_body():
+                assert not self.in_callback, "Read response bodies outside event callbacks"
+                return {"result": "synchronized", "cards": [{"cardId": self.card_id}]}
+
             self.listener(
                 SimpleNamespace(
                     url=URL,
                     status=200,
-                    json=lambda: {"result": "synchronized", "cards": [{"cardId": self.card_id}]},
+                    json=read_body,
                     request=SimpleNamespace(header_value=lambda name: "Bearer private-token"),
                 )
             )
+            self.in_callback = False
 
         def close(self):
             self.closed = True
