@@ -123,7 +123,12 @@ def setup(
             "Connect Libby, discover cards, and verify catalog access."
         )
     )
-    console.print("Complete Libby sign-in in the Chrome window that opens.")
+    console.print(
+        "Chrome is the new device. On its Welcome screen, choose Yes, I Have a "
+        "Library Card > Recover Your Data. Use Recover With Passkey, or choose "
+        "Display Setup Code in Chrome and enter that code on a Libby device "
+        "that has your cards, under Menu > Copy To Another Device."
+    )
     cards = _connect_native_browser(settings, timeout=timeout)
     settings.save()
     initialize_database(settings.database_path)

@@ -142,7 +142,7 @@ def connect_browser(
         with api.sync_playwright() as playwright:
             context = launch(playwright)
             try:
-                notify("Complete sign-in in the Libby browser window. Waiting for your cards…")
+                notify("Waiting for your cards to appear in the new Libby browser window…")
                 first = wait_for_account(
                     context,
                     context.pages[0] if context.pages else context.new_page(),

@@ -29,6 +29,13 @@ then verifies the same cards through a read-only account request. Only then does
 it save the native identity in the OS credential store. If verification fails,
 the existing native credential is retained.
 
+During recovery, Chrome is the **new** device. Prefer **Recover With Passkey**
+using a passkey created under **Menu → Back Up Your Data** on a Libby device
+that still has your cards. For a setup code, choose **Display Setup Code** in
+Chrome and enter that code on the device with your cards under **Menu → Copy To
+Another Device**. Entering a code in Chrome sends Chrome's data in the opposite
+direction.
+
 `libbyctl auth status` checks the saved identity. If it expires or is revoked,
 run `libbyctl setup` again. A native session with a saved device chip can attempt
 one refresh; a browser-derived token currently relies on browser reconnection.
