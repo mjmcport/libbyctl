@@ -42,7 +42,8 @@ class CredentialStore:
             import keyring  # type: ignore
         except ImportError as exc:
             raise CredentialStoreError(
-                "No supported OS credential backend is available. Install keyring or use LIBBYCTL_TOKEN."
+                "No supported OS credential backend is available. "
+                "Install keyring or use LIBBYCTL_TOKEN."
             ) from exc
         keyring.set_password(SERVICE, ACCOUNT, token)
 

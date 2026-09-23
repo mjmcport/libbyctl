@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -10,12 +12,16 @@ DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Version/14.0.2 Safari/605.1.15"
 )
+DEFAULT_CLIENT_VERSION = "22.1.1"
+PAIRING_CODE_TTL_SECONDS = 60
+PAIRING_POLL_INTERVAL_SECONDS = 3
+PAIRING_TIMEOUT_SECONDS = 600
 
 
 class LibbyClient:
     """Small client for the account-sync portion of Libby's private web API.
 
-    All protocol-specific behavior lives in this adapter so it can be replaced if the service changes.
+    Protocol-specific behavior lives here so the adapter can be replaced if the service changes.
     """
 
     def __init__(
@@ -23,10 +29,13 @@ class LibbyClient:
         base_url: str = "https://sentry.libbyapp.com",
         token: str | None = None,
         timeout: float = 20.0,
-        transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
+        client_version: str = DEFAULT_CLIENT_VERSION,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.chip_id: str | None = None
+        self.client_version = client_version
         self.client = httpx.Client(
             timeout=timeout,
             transport=transport,
@@ -42,7 +51,7 @@ class LibbyClient:
     def close(self) -> None:
         self.client.close()
 
-    def __enter__(self) -> "LibbyClient":
+    def __enter__(self) -> LibbyClient:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -94,37 +103,92 @@ class LibbyClient:
             "POST",
             "chip",
             authenticated=False,
-            params={"client": "dewey"},
+            params=self._chip_params(),
         )
         token = data.get("identity")
-        if not token:
-            raise AuthenticationError("Libby did not return an identity token.")
+        chip_id = data.get("chip")
+        if not token or not chip_id:
+            raise AuthenticationError("Libby did not return a new device identity.")
         self.token = str(token)
+        self.chip_id = str(chip_id)
         return self.token
 
     def refresh_chip(self) -> str:
+        if not self.chip_id:
+            raise AuthenticationError("No Libby device identity is available to refresh.")
         data = self._request(
             "POST",
             "chip",
             authenticated=True,
-            params={"client": "dewey"},
+            params=self._chip_params(self.chip_id),
         )
         token = data.get("identity")
         if not token:
             raise AuthenticationError("Libby did not return a refreshed identity token.")
+        if str(data.get("chip")) != self.chip_id:
+            raise AuthenticationError("Libby returned a different device identity during recovery.")
         self.token = str(token)
         return self.token
 
-    def clone_by_code(self, code: str) -> dict[str, Any]:
-        code = self.validate_setup_code(code)
-        if not self.token:
-            self.bootstrap_chip()
-        return self._request("POST", "chip/clone/code", data={"code": code})
-
-    def login_with_setup_code(self, code: str) -> dict[str, Any]:
+    def login_with_device_pairing(
+        self,
+        on_code: Callable[[str, float], None],
+        *,
+        poll_interval: float = PAIRING_POLL_INTERVAL_SECONDS,
+        timeout: float = PAIRING_TIMEOUT_SECONDS,
+    ) -> dict[str, Any]:
+        """Pair this new device with an existing Libby device using a recovery code."""
         self.bootstrap_chip()
-        self.clone_by_code(code)
-        return self.sync()
+        code, expiry = self._fetch_pairing_code()
+        on_code(code, expiry)
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            state = self._request(
+                "GET",
+                "chip/clone/code",
+                params={"code": code, "role": "pointer"},
+            )
+            if state.get("result") == "fulfilled":
+                blessing = state.get("blessing")
+                if not blessing:
+                    raise AuthenticationError("Libby approved pairing without a transfer token.")
+                self._request("POST", "chip/clone", json={"blessing": blessing})
+                self.refresh_chip()
+                return self.sync()
+
+            next_code = state.get("code")
+            if next_code and str(next_code) != code:
+                code = self.validate_setup_code(str(next_code))
+                expiry = _code_expiry(state.get("expiry"))
+                on_code(code, expiry)
+            elif time.time() >= expiry:
+                code, expiry = self._fetch_pairing_code()
+                on_code(code, expiry)
+
+            time.sleep(min(poll_interval, max(0.0, deadline - time.monotonic())))
+
+        raise AuthenticationError(
+            "Timed out waiting for the other Libby device to approve pairing."
+        )
+
+    def _fetch_pairing_code(self) -> tuple[str, float]:
+        state = self._request(
+            "GET",
+            "chip/clone/code",
+            params={"code": "", "role": "pointer"},
+        )
+        value = state.get("code")
+        if not isinstance(value, str):
+            raise AuthenticationError("Libby did not return a device-pairing code.")
+        code = self.validate_setup_code(value)
+        return code, _code_expiry(state.get("expiry"))
+
+    def _chip_params(self, chip_id: str | None = None) -> dict[str, str]:
+        params = {"c": f"d:{self.client_version}", "s": "0"}
+        if chip_id:
+            params["v"] = chip_id.split("-")[0]
+        return params
 
     def sync(self) -> dict[str, Any]:
         data = self._request("GET", "chip/sync")
@@ -143,3 +207,11 @@ def _result_text(response: httpx.Response) -> str:
         if value:
             return str(value)
     return response.text.strip()
+
+
+def _code_expiry(value: Any) -> float:
+    try:
+        expiry = float(value)
+    except (TypeError, ValueError):
+        return time.time() + PAIRING_CODE_TTL_SECONDS
+    return expiry

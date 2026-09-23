@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Annotated
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from libbyctl import __version__
 from libbyctl.config.credentials import CredentialStore
 from libbyctl.config.settings import Settings
-from libbyctl.domain.models import Card
 from libbyctl.exceptions import LibbyCtlError
 from libbyctl.output.render import cards_table, search_table
 from libbyctl.providers.catalog.thunder import ThunderCatalogProvider
@@ -22,7 +21,10 @@ from libbyctl.services.search import search_libraries
 from libbyctl.storage.database import database_ok, initialize_database
 
 console = Console()
-app = typer.Typer(no_args_is_help=True, help="Search and plan Libby access across all your library cards.")
+app = typer.Typer(
+    no_args_is_help=True,
+    help="Search and plan Libby access across all your library cards.",
+)
 auth_app = typer.Typer(help="Connect and manage your Libby identity.")
 app.add_typer(auth_app, name="auth")
 
@@ -32,10 +34,12 @@ def main() -> None:
         app()
     except LibbyCtlError as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
-        raise typer.Exit(code=2) from exc
+        raise SystemExit(2) from None
 
 
-def _clients(settings: Settings, token: str | None = None) -> tuple[LibbyClient, ThunderCatalogProvider]:
+def _clients(
+    settings: Settings, token: str | None = None
+) -> tuple[LibbyClient, ThunderCatalogProvider]:
     return (
         LibbyClient(settings.libby_base_url, token=token, timeout=settings.timeout_seconds),
         ThunderCatalogProvider(
@@ -73,12 +77,30 @@ def setup() -> None:
     """Interactive first-run setup."""
     settings = Settings.load()
     store = CredentialStore()
-    console.print(Panel.fit("[bold]Welcome to libbyctl[/bold]\nConnect Libby, discover cards, and verify catalog access."))
-    console.print("\nIn Libby, open [bold]Settings → Copy To Another Device[/bold] and reveal the setup code.")
-    code = Prompt.ask("Enter the 8-digit setup code")
+    console.print(
+        Panel.fit(
+            "[bold]Welcome to libbyctl[/bold]\n"
+            "Connect Libby, discover cards, and verify catalog access."
+        )
+    )
+    console.print(
+        "\nOn the Libby device that already has your cards, open "
+        "[bold]Menu → Copy To Another Device[/bold]. Enter the current code shown here."
+    )
+
+    def show_pairing_code(code: str, expiry: float) -> None:
+        remaining = max(0, round(expiry - time.time()))
+        console.print(
+            Panel.fit(
+                f"[bold cyan]{code}[/bold cyan]\nExpires in about {remaining} seconds. "
+                "The code refreshes automatically.",
+                title="Enter this code on your existing Libby device",
+            )
+        )
+
     libby, thunder = _clients(settings)
     try:
-        sync = libby.login_with_setup_code(code)
+        sync = libby.login_with_device_pairing(show_pairing_code)
         assert libby.token
         store.set_token(libby.token)
         website_ids = website_ids_from_sync(sync)
@@ -89,7 +111,10 @@ def setup() -> None:
         thunder.close()
     settings.save()
     initialize_database(settings.database_path)
-    console.print(f"\n[green]✓[/green] Libby connected\n[green]✓[/green] {len(cards)} card(s) discovered")
+    console.print(
+        f"\n[green]✓[/green] Libby connected\n"
+        f"[green]✓[/green] {len(cards)} card(s) discovered"
+    )
     if cards:
         cards_table(cards)
     console.print("[green]✓[/green] Configuration and local database initialized")
@@ -104,7 +129,9 @@ def auth_status() -> None:
     finally:
         libby.close()
         thunder.close()
-    console.print(f"[green]Connected[/green] — {len(cards)} card(s); config: {settings.config_path}")
+    console.print(
+        f"[green]Connected[/green] — {len(cards)} card(s); config: {settings.config_path}"
+    )
 
 
 @auth_app.command("logout")
@@ -116,7 +143,9 @@ def auth_logout() -> None:
 
 @auth_app.command("token")
 def auth_token(
-    token: Annotated[str, typer.Option(prompt=True, hide_input=True, help="Existing Libby identity token")],
+    token: Annotated[
+        str, typer.Option(prompt=True, hide_input=True, help="Existing Libby identity token")
+    ],
 ) -> None:
     """Import an existing identity token (advanced/recovery use)."""
     CredentialStore().set_token(token)
@@ -124,7 +153,11 @@ def auth_token(
 
 
 @app.command()
-def cards(json_output: Annotated[bool, typer.Option("--json", help="Return machine-readable JSON")] = False) -> None:
+def cards(
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Return machine-readable JSON")
+    ] = False,
+) -> None:
     """Show linked library cards and current loan/hold counts."""
     _, _, libby, thunder, sync = _load_account()
     try:
@@ -134,7 +167,12 @@ def cards(json_output: Annotated[bool, typer.Option("--json", help="Return machi
         libby.close()
         thunder.close()
     if json_output:
-        typer.echo(json.dumps([card.model_dump(mode="json", exclude={"raw"}) for card in values], indent=2))
+        typer.echo(
+            json.dumps(
+                [card.model_dump(mode="json", exclude={"raw"}) for card in values],
+                indent=2,
+            )
+        )
     else:
         cards_table(values)
 
@@ -142,10 +180,17 @@ def cards(json_output: Annotated[bool, typer.Option("--json", help="Return machi
 @app.command()
 def search(
     query: Annotated[str, typer.Argument(help="Title, author, ISBN, or keywords")],
-    author: Annotated[str | None, typer.Option("--author", "-a", help="Creator/author filter")] = None,
+    author: Annotated[
+        str | None, typer.Option("--author", "-a", help="Creator/author filter")
+    ] = None,
     media_type: Annotated[str | None, typer.Option("--format", help="ebook or audiobook")] = None,
-    library: Annotated[list[str] | None, typer.Option("--library", help="Limit to a library key; repeatable")] = None,
-    json_output: Annotated[bool, typer.Option("--json", help="Return machine-readable JSON")] = False,
+    library: Annotated[
+        list[str] | None,
+        typer.Option("--library", help="Limit to a library key; repeatable"),
+    ] = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Return machine-readable JSON")
+    ] = False,
     per_library: Annotated[int, typer.Option(min=1, max=24)] = 5,
 ) -> None:
     """Search every linked library and compare availability."""

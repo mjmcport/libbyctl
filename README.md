@@ -36,7 +36,9 @@ Run:
 libbyctl setup
 ```
 
-In Libby, use **Settings → Copy To Another Device**, reveal the 8-digit setup code, and enter it when prompted. The resulting identity token is stored in the OS credential store rather than the config file or SQLite database.
+`libbyctl setup` starts a new-device pairing and displays a short-lived code. On the Libby device that already has your cards, open **Menu → Copy To Another Device** and enter the current code shown by the CLI. Leave the command running while the code refreshes and the transfer completes. The resulting identity token is stored in the OS credential store rather than the config file or SQLite database.
+
+Libby recommends recovery passkeys for its supported apps and browsers. The CLI currently uses Libby's setup-code recovery flow; it does not perform a passkey ceremony.
 
 Advanced/recovery users can provide an existing token:
 
@@ -66,7 +68,7 @@ libbyctl doctor
 
 Implemented:
 
-- guided Libby setup-code login
+- guided Libby new-device pairing with rotating setup codes
 - secure credential abstraction
 - account/card sync
 - linked-library resolution

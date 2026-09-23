@@ -21,7 +21,11 @@ def cards_from_sync(sync: dict[str, Any], libraries: list[Library] | None = None
                 name=raw.get("cardName") or raw.get("username") or raw.get("name"),
                 website_id=website_id,
                 library_name=(lib.name if lib else library_raw.get("name")),
-                library_key=(lib.key if lib else library_raw.get("preferredKey") or library_raw.get("key")),
+                library_key=(
+                    lib.key
+                    if lib
+                    else library_raw.get("preferredKey") or library_raw.get("key")
+                ),
                 limits=CardLimits(
                     loans=_maybe_int(limits.get("loan")),
                     holds=_maybe_int(limits.get("hold")),

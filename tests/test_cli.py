@@ -1,6 +1,9 @@
+import pytest
 from typer.testing import CliRunner
 
+from libbyctl import cli
 from libbyctl.cli.app import app
+from libbyctl.exceptions import LibbyCtlError
 
 runner = CliRunner()
 
@@ -15,3 +18,15 @@ def test_help():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "Search and plan Libby access" in result.stdout
+
+
+def test_main_reports_cli_errors_without_traceback(monkeypatch, capsys):
+    def raise_cli_error():
+        raise LibbyCtlError("Libby is not connected. Run: libbyctl setup")
+
+    monkeypatch.setattr(cli.app, "app", raise_cli_error)
+    with pytest.raises(SystemExit) as result:
+        cli.app.main()
+
+    assert result.value.code == 2
+    assert "Libby is not connected" in capsys.readouterr().out
