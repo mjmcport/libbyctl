@@ -93,6 +93,13 @@ class LibbyClient:
             raise ProviderUnavailableError(f"Could not contact Libby: {exc}") from exc
 
         result = _result_code(response)
+        if response.status_code == 403 and _has_private_api_notice(response):
+            raise AuthenticationError(
+                "Libby refused this request and returned a notice restricting its private API "
+                "to the official Libby client (HTTP 403). "
+                "CLI account setup is currently blocked. Use the official Libby app or "
+                "https://libbyapp.com to access your account."
+            )
         if result == "missing_chip" and retry_missing_chip and authenticated and path != "chip":
             if not self.chip_id:
                 raise AuthenticationError(
@@ -257,6 +264,18 @@ def _result_text(response: httpx.Response) -> str:
         if value:
             return str(value)
     return response.text.strip()
+
+
+def _has_private_api_notice(response: httpx.Response) -> bool:
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    notice = body.get("notice") if isinstance(body, dict) else None
+    if not isinstance(notice, str):
+        return False
+    notice = notice.casefold()
+    return "private api" in notice and "use by any other client" in notice
 
 
 def _result_code(response: httpx.Response) -> str | None:

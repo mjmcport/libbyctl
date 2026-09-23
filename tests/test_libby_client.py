@@ -82,6 +82,34 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
     ]
 
 
+def test_private_api_notice_stops_without_retry_or_echoing_secrets():
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            403,
+            json={
+                "result": "missing_chip",
+                "notice": "This is a private API. Use by any other client is prohibited. "
+                "12345678 secret-token",
+            },
+        )
+
+    with LibbyClient(
+        "https://example.test", token="secret-token", transport=httpx.MockTransport(handler)
+    ) as client:
+        client.chip_id = "existing-chip"
+        with pytest.raises(
+            AuthenticationError, match="CLI account setup is currently blocked"
+        ) as exc:
+            client._request("POST", "chip/clone", json={"blessing": "test-grant"})
+        assert len(requests) == 1
+        assert client.token == "secret-token"
+        assert "12345678" not in str(exc.value)
+        assert "secret-token" not in str(exc.value)
+
+
 def test_pairing_rejects_identity_replacement():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

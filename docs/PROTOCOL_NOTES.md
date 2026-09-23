@@ -4,6 +4,15 @@ These notes exist so the implementation can be maintained without leaking servic
 
 ## Libby account adapter
 
+**Live setup is blocked as of 2026-09-23.** Anonymous test-device transfers reached
+code approval but `POST /chip/clone` returned HTTP 403 with `result=missing_chip`.
+The server also returned a notice restricting this private API to the official
+Libby client. This does not establish the internal cause of every `missing_chip`
+response. No successful live account transfer has been verified. The sequence
+below describes the intended flow, not proven CLI compatibility. Mock tests
+cannot validate service acceptance; further speculative pairing retries are not
+a remedy. Use the official Libby app or website for account access.
+
 Current community implementations and observed web-client behavior use `https://sentry.libbyapp.com` for account/device state.
 
 The current Libby recovery-code flow treats the CLI as the new device. The CLI:
