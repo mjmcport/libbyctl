@@ -84,7 +84,10 @@ class LibbyClient:
             raise ProviderUnavailableError(f"Could not contact Libby: {exc}") from exc
 
         if response.status_code in (401, 403):
-            raise AuthenticationError("Libby rejected the current identity token.")
+            endpoint = path.lstrip("/")
+            raise AuthenticationError(
+                f"Libby rejected the current identity token for {endpoint}."
+            )
         if response.status_code == 404:
             detail = _result_text(response)
             raise AuthenticationError(detail or "Libby could not find that setup code or account.")
@@ -154,7 +157,11 @@ class LibbyClient:
                 if not blessing:
                     raise AuthenticationError("Libby approved pairing without a transfer token.")
                 self._request("POST", "chip/clone", json={"blessing": blessing})
-                self.refresh_chip()
+                # Cloning replaces this device's temporary identity. Libby's recovery flow
+                # discards it and acquires a fresh identity before syncing the recovered data.
+                self.token = None
+                self.chip_id = None
+                self.bootstrap_chip()
                 return self.sync()
 
             next_code = state.get("code")

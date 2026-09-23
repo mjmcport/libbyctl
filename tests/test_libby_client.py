@@ -9,25 +9,20 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
     seen = []
     displayed_codes = []
     expiry = 2_000_000_000
+    chip_count = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal chip_count
         seen.append(request)
         if request.url.path == "/chip":
-            if request.headers.get("authorization"):
-                assert request.url.params["v"] == "abcdef12"
-                return httpx.Response(
-                    200,
-                    json={
-                        "chip": "abcdef12-3456-7890-abcd-ef1234567890",
-                        "identity": "paired-token",
-                    },
-                )
+            chip_count += 1
+            assert "authorization" not in request.headers
             assert request.url.params["c"] == "d:22.1.1"
             return httpx.Response(
                 200,
                 json={
-                    "chip": "abcdef12-3456-7890-abcd-ef1234567890",
-                    "identity": "temporary-token",
+                    "chip": "temporary-chip" if chip_count == 1 else "paired-chip",
+                    "identity": "temporary-token" if chip_count == 1 else "paired-token",
                 },
             )
         if request.url.path == "/chip/clone/code" and request.method == "GET":
@@ -85,4 +80,23 @@ def test_pairing_rejects_identity_replacement():
     with pytest.raises(AuthenticationError, match="different device identity"):
         client.refresh_chip()
     assert client.token == "old-token"
+    client.close()
+
+
+def test_auth_error_identifies_endpoint_without_echoing_pairing_code():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401)
+
+    client = LibbyClient(
+        "https://example.test", token="secret-token", transport=httpx.MockTransport(handler)
+    )
+    with pytest.raises(AuthenticationError) as exc_info:
+        client._request(
+            "GET",
+            "chip/clone/code",
+            params={"code": "12345678", "role": "pointer"},
+        )
+    assert "chip/clone/code" in str(exc_info.value)
+    assert "12345678" not in str(exc_info.value)
+    assert "secret-token" not in str(exc_info.value)
     client.close()
