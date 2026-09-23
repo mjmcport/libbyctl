@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -15,6 +17,7 @@ from libbyctl.services.account import (
     website_ids_from_sync,
 )
 from libbyctl.services.circulation import CirculationAction, CirculationIntent, execute
+from libbyctl.services.timeline import summarize_timeline
 
 app = typer.Typer(no_args_is_help=True, help="Review and change one exact title on a linked card.")
 
@@ -22,6 +25,44 @@ app = typer.Typer(no_args_is_help=True, help="Review and change one exact title 
 class Format(StrEnum):
     ebook = "ebook"
     audiobook = "audiobook"
+
+
+@app.command("activity")
+def activity(
+    spreadsheet: Annotated[Path, typer.Argument(help="Unfiltered Libby Timeline CSV export")],
+    days: Annotated[int, typer.Option(min=1, help="Recent days to count")] = 7,
+    json_output: Annotated[bool, typer.Option("--json", help="Machine-readable summary")] = False,
+) -> None:
+    """Count recent checkouts and returns across libraries in a Timeline export."""
+    report = summarize_timeline(spreadsheet, days=days)
+    if json_output:
+        typer.echo(json.dumps({
+            "since": report.since.isoformat(timespec="minutes"),
+            "until": report.until.isoformat(timespec="minutes"),
+            "borrowed": report.borrowed,
+            "returned": report.returned,
+            "by_library": report.by_library,
+        }, indent=2))
+        return
+    typer.echo(
+        f"Timeline activity in the past {days} day(s): "
+        f"{report.borrowed} borrowed, {report.returned} returned."
+    )
+    for library, count in report.by_library.items():
+        typer.echo(f"  {library}: {count['borrowed']} borrowed, {count['returned']} returned")
+    typer.echo("Recent events:")
+    for event in report.events[:10]:
+        typer.echo(
+            f"  {event.date:%Y-%m-%d %H:%M}  {event.activity.title():8}  "
+            f"{event.library}  {event.title}"
+        )
+    if not report.events:
+        typer.echo("  None in this export and time window.")
+    typer.echo(
+        "Counts depend on the export's filters and completeness. Libby exports identify "
+        "libraries, not individual cards. Returns do not erase earlier checkouts. "
+        "OverDrive has not published a churning threshold; this is not a borrowing clearance."
+    )
 
 
 @app.command("candidates")

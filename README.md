@@ -126,6 +126,28 @@ requests were refused with `PatronExceededChurningLimit`, while a temporary hold
 was placed, suspended, resumed, and canceled successfully. No test loan or hold
 remained afterward.
 
+## Review recent borrowing activity
+
+Libby's [Timeline](https://help.libbyapp.com/en-us/categories/reading-history.htm)
+shows borrowing and returns from all linked libraries. In Libby, open **Shelf →
+Timeline → Actions → Export Timeline → Spreadsheet** and save an **unfiltered**
+export. Then run:
+
+```bash
+libbyctl circulation activity PATH_TO_EXPORTED_CSV
+libbyctl circulation activity PATH_TO_EXPORTED_CSV --days 14 --json
+```
+
+The command reads the CSV locally, counts recent borrowed and returned events
+by library, and shows the ten most recent events. It does not store or upload the
+export. Libby's export identifies the library, not the individual card, so
+multiple cards at one library cannot be separated. Filters applied before export
+can hide activity; [recover card history](https://help.libbyapp.com/en-us/6281.htm)
+in Libby if older activity is missing. Returns do not cancel checkout events in
+this report. The count is useful context for a `PatronExceededChurningLimit`
+rejection, but OverDrive has not published a reliable threshold or scope for that
+restriction, so the tool does not claim that another borrow will succeed.
+
 ## Candidate libraries
 
 `libbyctl libraries import FILE.json` accepts an array of reviewed records with

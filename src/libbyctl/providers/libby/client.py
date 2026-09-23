@@ -140,7 +140,9 @@ class LibbyClient:
             if code == "PatronExceededChurningLimit":
                 raise CirculationRejectedError(
                     "Libby refused this checkout because the account reached a borrowing "
-                    "activity limit. Try again after the limit clears or ask your library."
+                    "activity limit. Review Shelf > Timeline in Libby, or run "
+                    "libbyctl circulation activity with a fresh unfiltered Timeline export. "
+                    "The threshold is not published; ask your library if the limit persists."
                 )
             if code == "TitleNoLongerAvailable":
                 raise CirculationRejectedError(
