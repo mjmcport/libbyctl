@@ -83,9 +83,13 @@ def test_pairing_rejects_identity_replacement():
     client.close()
 
 
-def test_auth_error_identifies_endpoint_without_echoing_pairing_code():
+@pytest.mark.parametrize(
+    ("status", "failure"),
+    [(401, "identity token"), (403, "request")],
+)
+def test_auth_error_identifies_endpoint_without_echoing_pairing_code(status, failure):
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(401)
+        return httpx.Response(status)
 
     client = LibbyClient(
         "https://example.test", token="secret-token", transport=httpx.MockTransport(handler)
@@ -97,6 +101,8 @@ def test_auth_error_identifies_endpoint_without_echoing_pairing_code():
             params={"code": "12345678", "role": "pointer"},
         )
     assert "chip/clone/code" in str(exc_info.value)
+    assert failure in str(exc_info.value)
+    assert f"HTTP {status}" in str(exc_info.value)
     assert "12345678" not in str(exc_info.value)
     assert "secret-token" not in str(exc_info.value)
     client.close()

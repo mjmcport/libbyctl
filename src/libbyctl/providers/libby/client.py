@@ -85,8 +85,10 @@ class LibbyClient:
 
         if response.status_code in (401, 403):
             endpoint = path.lstrip("/")
+            failure = "identity token" if response.status_code == 401 else "request"
             raise AuthenticationError(
-                f"Libby rejected the current identity token for {endpoint}."
+                f"Libby rejected the {failure} for {endpoint} "
+                f"(HTTP {response.status_code})."
             )
         if response.status_code == 404:
             detail = _result_text(response)
