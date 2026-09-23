@@ -42,6 +42,7 @@ class LibbyClient:
             headers={
                 "User-Agent": DEFAULT_USER_AGENT,
                 "Accept": "application/json",
+                "Origin": "https://libbyapp.com",
                 "Referer": "https://libbyapp.com/",
                 "Cache-Control": "no-cache",
                 "Pragma": "no-cache",

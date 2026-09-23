@@ -39,6 +39,7 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
             return httpx.Response(200, json={"result": "fulfilled", "blessing": "transfer-grant"})
         if request.url.path == "/chip/clone":
             assert request.headers["authorization"] == "Bearer temporary-token"
+            assert request.headers["origin"] == "https://libbyapp.com"
             assert request.read() == b'{"blessing":"transfer-grant"}'
             return httpx.Response(200, json={"result": "cloned"})
         if request.url.path == "/chip/sync":
