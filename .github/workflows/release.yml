@@ -1,0 +1,71 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  build-binary:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            asset: macos-arm64
+          - os: macos-15-intel
+            asset: macos-x86_64
+          - os: windows-latest
+            asset: windows-x86_64
+          - os: ubuntu-latest
+            asset: linux-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --extra dev
+      - run: uv run pyinstaller packaging/pyinstaller/libbyctl.spec --noconfirm
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir bundle
+          cp dist/libbyctl bundle/libbyctl
+          tar -czf libbyctl-${{ github.ref_name }}-${{ matrix.asset }}.tar.gz -C bundle libbyctl
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/libbyctl.exe -DestinationPath libbyctl-${{ github.ref_name }}-${{ matrix.asset }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: libbyctl-${{ github.ref_name }}-${{ matrix.asset }}.*
+
+  github-release:
+    needs: [build-python, build-binary]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*
+          generate_release_notes: true

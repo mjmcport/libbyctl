@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+MediaType = Literal["audiobook", "ebook", "magazine", "other"]
+
+
+class Library(BaseModel):
+    website_id: int | str
+    name: str
+    key: str
+
+
+class CardLimits(BaseModel):
+    loans: int | None = None
+    holds: int | None = None
+
+
+class CardCounts(BaseModel):
+    loans: int = 0
+    holds: int = 0
+
+
+class Card(BaseModel):
+    id: str
+    name: str | None = None
+    website_id: int | str | None = None
+    library_name: str | None = None
+    library_key: str | None = None
+    limits: CardLimits = Field(default_factory=CardLimits)
+    counts: CardCounts = Field(default_factory=CardCounts)
+    raw: dict[str, Any] = Field(default_factory=dict, exclude=True)
+
+
+class CatalogItem(BaseModel):
+    id: str
+    title: str
+    subtitle: str | None = None
+    creators: list[str] = Field(default_factory=list)
+    media_type: MediaType = "other"
+    formats: list[str] = Field(default_factory=list)
+    isbn: str | None = None
+    cover_url: str | None = None
+    raw: dict[str, Any] = Field(default_factory=dict, exclude=True)
+
+
+class Availability(BaseModel):
+    library_key: str
+    title_id: str
+    is_available: bool = False
+    available_copies: int | None = None
+    owned_copies: int | None = None
+    holds_count: int | None = None
+    estimated_wait_days: int | None = None
+    lucky_day_available_copies: int | None = None
+
+
+class SearchResult(BaseModel):
+    library: Library
+    item: CatalogItem
+    availability: Availability | None = None
