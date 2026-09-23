@@ -3,10 +3,15 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
-from libbyctl.exceptions import AuthenticationError, ProviderUnavailableError
+from libbyctl.exceptions import (
+    AuthenticationError,
+    CirculationRejectedError,
+    ProviderUnavailableError,
+)
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_1) AppleWebKit/605.1.15 "
@@ -124,8 +129,24 @@ class LibbyClient:
                 f"(HTTP {response.status_code}{detail})."
             )
         if response.status_code == 404:
+            if path.startswith("card/"):
+                raise CirculationRejectedError(
+                    "Libby could not find that card or title. Refresh the account and catalog."
+                )
             detail = _result_text(response)
             raise AuthenticationError(detail or "Libby could not find that setup code or account.")
+        if response.status_code == 400 and method in {"POST", "PUT", "DELETE"}:
+            code = _upstream_error_code(response)
+            if code == "PatronExceededChurningLimit":
+                raise CirculationRejectedError(
+                    "Libby refused this checkout because the account reached a borrowing "
+                    "activity limit. Try again after the limit clears or ask your library."
+                )
+            if code == "TitleNoLongerAvailable":
+                raise CirculationRejectedError(
+                    "Libby says this title is no longer available. Refresh the catalog "
+                    "and choose another edition."
+                )
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -134,7 +155,14 @@ class LibbyClient:
             ) from exc
         if not response.content:
             return {}
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as exc:
+            if method in {"POST", "PUT", "DELETE"}:
+                return {}
+            raise ProviderUnavailableError(
+                "Libby returned an unreadable account response."
+            ) from exc
 
     def bootstrap_chip(self) -> str:
         data = self._request(
@@ -237,6 +265,61 @@ class LibbyClient:
             raise AuthenticationError("Libby account synchronization did not complete.")
         return data
 
+    @staticmethod
+    def _circulation_path(card_id: str, kind: str, title_id: str) -> str:
+        if not card_id or not title_id:
+            raise ValueError("A card and title ID are required.")
+        return f"card/{quote(card_id, safe='')}/{kind}/{quote(title_id, safe='')}"
+
+    def borrow_title(
+        self, card_id: str, title_id: str, title_format: str, days: int
+    ) -> dict[str, Any]:
+        if title_format not in {"ebook", "audiobook"} or days < 1:
+            raise ValueError("Borrowing requires an ebook/audiobook format and positive days.")
+        return self._request(
+            "POST", self._circulation_path(card_id, "loan", title_id),
+            json={"period": days, "units": "days", "title_format": title_format},
+            retry_missing_chip=False,
+        )
+
+    def create_hold(self, card_id: str, title_id: str) -> dict[str, Any]:
+        return self._request(
+            "POST", self._circulation_path(card_id, "hold", title_id),
+            json={"days_to_suspend": 0, "email_address": ""},
+            retry_missing_chip=False,
+        )
+
+    def return_title(self, card_id: str, title_id: str) -> dict[str, Any]:
+        return self._request(
+            "DELETE", self._circulation_path(card_id, "loan", title_id),
+            retry_missing_chip=False,
+        )
+
+    def cancel_hold(self, card_id: str, title_id: str) -> dict[str, Any]:
+        return self._request(
+            "DELETE", self._circulation_path(card_id, "hold", title_id),
+            retry_missing_chip=False,
+        )
+
+    def suspend_hold(self, card_id: str, title_id: str, days: int) -> dict[str, Any]:
+        if days not in set(range(0, 31)) | {60, 90}:
+            raise ValueError("Hold suspension must be 0–30, 60, or 90 days.")
+        return self._request(
+            "PUT", self._circulation_path(card_id, "hold", title_id),
+            json={"days_to_suspend": days}, retry_missing_chip=False,
+        )
+
+    def renew_title(
+        self, card_id: str, title_id: str, title_format: str, days: int
+    ) -> dict[str, Any]:
+        if title_format not in {"ebook", "audiobook"} or days < 1:
+            raise ValueError("Renewal requires an ebook/audiobook format and positive days.")
+        return self._request(
+            "PUT", self._circulation_path(card_id, "loan", title_id),
+            json={"period": days, "units": "days", "title_format": title_format},
+            retry_missing_chip=False,
+        )
+
 
 def _result_text(response: httpx.Response) -> str:
     try:
@@ -244,10 +327,29 @@ def _result_text(response: httpx.Response) -> str:
     except Exception:
         return response.text.strip()
     if isinstance(body, dict):
+        upstream = body.get("upstream")
+        if body.get("result") == "upstream_failure" and isinstance(upstream, dict):
+            code = upstream.get("errorCode")
+            if isinstance(code, str):
+                safe_code = "".join(c for c in code if c.isalnum() or c in "_-.")[:80]
+                if safe_code:
+                    return f"upstream_failure ({safe_code})"
         value = body.get("result") or body.get("message")
         if value:
             return str(value)
     return response.text.strip()
+
+
+def _upstream_error_code(response: httpx.Response) -> str | None:
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    upstream = body.get("upstream")
+    code = upstream.get("errorCode") if isinstance(upstream, dict) else None
+    return code if isinstance(code, str) else None
 
 
 def _has_private_api_notice(response: httpx.Response) -> bool:

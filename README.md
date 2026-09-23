@@ -2,8 +2,9 @@
 
 `libbyctl` helps you search the catalogs connected to your Libby account and
 compare ebook and audiobook availability. It can import reading lists, make
-read-only loan/hold plans, and compare sourced candidate libraries. Borrowing,
-holds, returns, and bulk account changes are not exposed yet.
+read-only loan/hold plans, and compare sourced candidate libraries. Explicit
+single-title borrow, hold, return, and hold cancellation are available through
+the connected Libby account. Bulk account changes are not exposed yet.
 
 This is an unofficial alpha. It uses interfaces that can change, and it is not
 affiliated with OverDrive or Libby.
@@ -99,6 +100,29 @@ The proposal reserves capacity for earlier entries but never changes the library
 account. Weak or ambiguous matches, unknown ownership, and incomplete searches need
 review. A refreshed plan is saved as a new snapshot; the old one remains intact.
 
+## Single-title circulation (preview)
+
+Find an exact edition ID, then use a stable operation ID for each intended
+change. The command shows the book and card for confirmation; `--yes` is for an
+action you have already reviewed.
+
+```bash
+libbyctl circulation candidates 'Pride and Prejudice' --format ebook --author 'Jane Austen'
+libbyctl circulation borrow TITLE_ID --format ebook --operation-id my-borrow-1
+libbyctl circulation return TITLE_ID --operation-id my-return-1
+libbyctl circulation hold TITLE_ID --format ebook --operation-id my-hold-1
+libbyctl circulation cancel-hold TITLE_ID --operation-id my-cancel-1
+```
+
+Each command reads fresh account and catalog state before a write and verifies
+the account state afterward. If a response is uncertain, retry with the same
+operation ID so the tool can reconcile the result without repeating the write.
+Use a new operation ID only for a distinct action after resolving a structured
+rejection. The private Libby service is undocumented; library account rules can
+refuse an otherwise available title. In the September 2026 live test, borrow
+requests were refused with `PatronExceededChurningLimit`, while a temporary hold
+was placed and canceled successfully. No test loan or hold remained afterward.
+
 ## Candidate libraries
 
 `libbyctl libraries import FILE.json` accepts an array of reviewed records with
@@ -120,10 +144,10 @@ waits, preferred-format coverage, fee, source age, and eligibility text. These
 are research leads: a matching area does not establish membership eligibility
 or personalized borrowing access.
 
-The circulation engine has explicit confirmation, fresh-state checks, and a
-durable audit record for safe retries, but it currently has no configured
-authorized write provider. The existing Libby browser identity is used only for
-read-only account operations. See [`docs/PHASE3_TO_PHASE8_PROGRESS.md`](docs/PHASE3_TO_PHASE8_PROGRESS.md).
+The circulation engine keeps an audit record without credentials or title/card
+IDs. Renew and hold suspension have private-client methods but are not exposed
+as CLI commands until their account-state checks are verified. See
+[`docs/PHASE3_TO_PHASE8_PROGRESS.md`](docs/PHASE3_TO_PHASE8_PROGRESS.md).
 
 ## Local integrations
 

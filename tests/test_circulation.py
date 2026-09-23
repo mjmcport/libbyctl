@@ -140,15 +140,12 @@ def test_partially_completed_bulk_plan_reconciles_without_duplicate(tmp_path):
 def test_single_item_actions_require_exact_state_and_inputs(tmp_path):
     provider = Provider()
     path = tmp_path / "data.db"
-    with pytest.raises(LibbyCtlError, match="email"):
-        execute(path, provider, CirculationIntent("hold", CirculationAction.HOLD, "card", "wait"),
-                confirmed=True)
     with pytest.raises(LibbyCtlError, match="No matching hold"):
         execute(path, provider, CirculationIntent(
             "cancel", CirculationAction.CANCEL_HOLD, "card", "wait"
         ), confirmed=True)
     assert execute(path, provider, CirculationIntent("hold", CirculationAction.HOLD,
-                                                    "card", "wait", email="a@b.c"),
+                                                    "card", "wait"),
                    confirmed=True) == "applied"
     assert execute(path, provider, CirculationIntent("suspend", CirculationAction.SUSPEND_HOLD,
                                                     "card", "wait", suspension_days=7),

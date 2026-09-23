@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from libbyctl import __version__
+from libbyctl.cli.circulation import app as circulation_app
 from libbyctl.cli.lists import app as lists_app
 from libbyctl.cli.plans import app as plans_app
 from libbyctl.cli.plans import create_plan
@@ -40,6 +41,7 @@ app = typer.Typer(
 )
 auth_app = typer.Typer(help="Connect and manage your Libby identity.")
 app.add_typer(auth_app, name="auth")
+app.add_typer(circulation_app, name="circulation")
 app.add_typer(lists_app, name="lists")
 app.add_typer(plans_app, name="plans")
 app.add_typer(libraries_app, name="libraries")

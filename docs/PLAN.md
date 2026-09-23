@@ -18,10 +18,11 @@ library, but match quality and absent titles still need independent review.
 
 Phase 3 now has persistent read-only plans and refresh. A live one-card check
 classified the 13-title example and saved/refreshed it in an isolated database.
-Phases 4–5 have a simulated, provider-neutral circulation engine with confirmation,
-fresh-state checks, and durable retry reconciliation, but no live write adapter.
-Research found an unofficial private Libby circulation path using a regular linked
-account; see `docs/PRIVATE_CIRCULATION_RESEARCH.md`. Phases 6–7 have a sourced-record registry and catalog comparison, with
+Phases 4–5 have a provider-neutral circulation engine with confirmation,
+fresh-state checks, and durable retry reconciliation. The private Libby adapter
+now supports explicit borrow/hold/return/cancel-hold commands. A live hold and
+cancel succeeded; live ebook/audiobook borrow was refused by an account activity
+limit. See `docs/PRIVATE_CIRCULATION_RESEARCH.md`. Phases 6–7 have a sourced-record registry and catalog comparison, with
 no published eligibility records until location and official terms are verified.
 Phase 8 has aggregate JSON and an optional read-only local MCP stdio server;
 the HTTP API, Home Assistant-specific setup, and `odmpy` trigger remain open.

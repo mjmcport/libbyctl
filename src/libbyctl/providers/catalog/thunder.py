@@ -93,6 +93,9 @@ class ThunderCatalogProvider:
             lucky_day_available_copies=_int_or_none(data.get("luckyDayAvailableCopies")),
         )
 
+    def title(self, library_key: str, title_id: str) -> CatalogItem:
+        return self._parse_item(self._get(f"libraries/{library_key}/media/{title_id}"))
+
     @staticmethod
     def _parse_library(raw: dict[str, Any]) -> Library:
         return Library(

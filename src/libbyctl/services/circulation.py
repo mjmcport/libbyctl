@@ -1,7 +1,7 @@
 """Provider-neutral circulation execution with durable duplicate protection.
 
-The current Libby identity is never passed to this boundary. A provider must
-separately supply authorized patron state and write operations.
+The Libby identity stays inside a provider. This boundary receives patron state
+and actions, never credentials.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Protocol
 
 from libbyctl.domain.models import PlanSnapshot, ProposedAction
-from libbyctl.exceptions import LibbyCtlError
+from libbyctl.exceptions import CirculationRejectedError, LibbyCtlError
 from libbyctl.storage.database import initialize_database
 
 
@@ -37,6 +37,7 @@ class CirculationIntent:
     title_id: str
     email: str | None = None
     suspension_days: int | None = None
+    media_type: str | None = None
 
 
 @dataclass
@@ -94,7 +95,8 @@ def _operation_key(intent: CirculationIntent) -> str:
     if not intent.operation_id.strip():
         raise LibbyCtlError("An operation ID is required for safe retry.")
     payload = "\0".join((
-        intent.operation_id, intent.action, intent.card_id, intent.title_id
+        intent.operation_id, intent.action, intent.card_id, intent.title_id,
+        intent.media_type or "",
     )).encode()
     return hashlib.sha256(payload).hexdigest()
 
@@ -146,8 +148,6 @@ def execute(
         raise LibbyCtlError("Confirm the exact action before changing a library account.")
     if not intent.card_id or not intent.title_id:
         raise LibbyCtlError("A specific card and catalog title are required.")
-    if intent.action == CirculationAction.HOLD and not intent.email:
-        raise LibbyCtlError("A hold notification email is required by the provider.")
     if intent.action == CirculationAction.SUSPEND_HOLD and (
         intent.suspension_days is None or intent.suspension_days < 1
     ):
@@ -156,6 +156,10 @@ def execute(
     previous = _recorded_status(path, key)
     if previous == "succeeded":
         return "already_applied"
+    if previous == "rejected":
+        raise LibbyCtlError(
+            "This operation was rejected. Resolve the provider limit and use a new operation ID."
+        )
     state = provider.snapshot()
     done, allowed, reason = _state(intent, state)
     if previous in {"pending", "review"}:
@@ -178,6 +182,9 @@ def execute(
         )
     try:
         provider.perform(intent)
+    except CirculationRejectedError:
+        _record(path, key, intent.action, "rejected")
+        raise
     except Exception as exc:
         _record(path, key, intent.action, "review")
         raise LibbyCtlError(
@@ -224,6 +231,7 @@ def plan_intents(
             card_id=entry.card_id,
             title_id=entry.title_id,
             email=email,
+            media_type=entry.media_type,
         ))
     return intents
 
