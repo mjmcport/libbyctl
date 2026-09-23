@@ -12,6 +12,10 @@ from rich.table import Table
 
 from libbyctl import __version__
 from libbyctl.cli.lists import app as lists_app
+from libbyctl.cli.plans import app as plans_app
+from libbyctl.cli.plans import create_plan
+from libbyctl.cli.scout import app as libraries_app
+from libbyctl.cli.scout import scout
 from libbyctl.config.credentials import CredentialStore, SessionCredential
 from libbyctl.config.settings import Settings
 from libbyctl.domain.models import Card
@@ -37,6 +41,18 @@ app = typer.Typer(
 auth_app = typer.Typer(help="Connect and manage your Libby identity.")
 app.add_typer(auth_app, name="auth")
 app.add_typer(lists_app, name="lists")
+app.add_typer(plans_app, name="plans")
+app.add_typer(libraries_app, name="libraries")
+app.command("plan")(create_plan)
+app.command("scout")(scout)
+
+
+@app.command("mcp")
+def mcp_server() -> None:
+    """Serve read-only stored plans and candidate libraries to a local MCP host."""
+    from libbyctl.integrations.mcp_server import run
+
+    run()
 
 
 class SearchFormat(StrEnum):

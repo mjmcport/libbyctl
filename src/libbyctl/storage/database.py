@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 
 def initialize_database(path: Path) -> None:
@@ -40,6 +40,16 @@ def initialize_database(path: Path) -> None:
                 author TEXT,
                 isbn TEXT,
                 PRIMARY KEY (list_id, position)
+            );
+            CREATE TABLE IF NOT EXISTS circulation_actions (
+                operation_key TEXT PRIMARY KEY,
+                action TEXT NOT NULL,
+                status TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS candidate_libraries (
+                library_key TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL
             );
             """
         )

@@ -16,6 +16,16 @@ import, normalization, work/edition grouping, and explicit match states. The
 13-title 2026 Booker example received a result for every entry in the connected
 library, but match quality and absent titles still need independent review.
 
+Phase 3 now has persistent read-only plans and refresh. A live one-card check
+classified the 13-title example and saved/refreshed it in an isolated database.
+Phases 4–5 have a simulated, provider-neutral circulation engine with confirmation,
+fresh-state checks, and durable retry reconciliation, but no authorized live write
+provider. Phases 6–7 have a sourced-record registry and catalog comparison, with
+no published eligibility records until location and official terms are verified.
+Phase 8 has aggregate JSON and an optional read-only local MCP stdio server;
+the HTTP API, Home Assistant-specific setup, and `odmpy` trigger remain open.
+See `docs/PHASE3_TO_PHASE8_PROGRESS.md` for test evidence and remaining gates.
+
 ## Product direction
 
 `libbyctl` is not a downloader. It is the discovery, planning, and circulation-control layer for a user's Libby libraries. Download workflows such as `odmpy` remain separate downstream tools.

@@ -1,9 +1,9 @@
 # libbyctl
 
 `libbyctl` helps you search the catalogs connected to your Libby account and
-compare ebook and audiobook availability. It can import reading lists and flag
-catalog matches for review. Borrowing, holds, returns, and bulk actions are not
-available yet.
+compare ebook and audiobook availability. It can import reading lists, make
+read-only loan/hold plans, and compare sourced candidate libraries. Borrowing,
+holds, returns, and bulk account changes are not exposed yet.
 
 This is an unofficial alpha. It uses interfaces that can change, and it is not
 affiliated with OverDrive or Libby.
@@ -82,6 +82,58 @@ records are the same work. Import and match make no circulation changes.
 
 The bundled 2026 Booker longlist example is transcribed from the
 [official Booker announcement](https://thebookerprizes.com/media-centre/press-releases/longlist-for-booker-prize-2026-rewards-risk).
+
+## Read-only plans
+
+```bash
+libbyctl plan booker-2026
+libbyctl plans list
+libbyctl plans show PLAN_ID --json
+libbyctl plans refresh PLAN_ID
+```
+
+Plans compare the current loans and holds, catalog matches, availability, format
+preferences, and known card limits. They propose `BORROW`, `HOLD`,
+`KEEP_EXISTING_HOLD`, `ALREADY_BORROWED`, `SKIP`, `NOT_OWNED`, or `NEEDS_REVIEW`.
+The proposal reserves capacity for earlier entries but never changes the library
+account. Weak or ambiguous matches, unknown ownership, and incomplete searches need
+review. A refreshed plan is saved as a new snapshot; the old one remains intact.
+
+## Candidate libraries
+
+`libbyctl libraries import FILE.json` accepts an array of reviewed records with
+`name`, `library_key`, `eligibility_area`, `eligibility_rule`, `membership_fee_usd`,
+`term_months`, `online_join`, `libby_access`, `official_source_url` (HTTPS), and
+`verified_on` (ISO date). No candidate records ship with the app; verify the
+official eligibility and fee source before importing one.
+
+```bash
+libbyctl libraries import my-candidates.json
+libbyctl libraries list
+libbyctl scout booker-2026 --area Michigan
+libbyctl scout booker-2026 --plan-id PLAN_ID --json
+```
+
+`scout` compares public catalog coverage with the latest saved plan for the
+list. It shows newly covered titles, immediate availability, shorter estimated
+waits, preferred-format coverage, fee, source age, and eligibility text. These
+are research leads: a matching area does not establish membership eligibility
+or personalized borrowing access.
+
+The circulation engine has explicit confirmation, fresh-state checks, and a
+durable audit record for safe retries, but it currently has no configured
+authorized write provider. The existing Libby browser identity is used only for
+read-only account operations. See [`docs/PHASE3_TO_PHASE8_PROGRESS.md`](docs/PHASE3_TO_PHASE8_PROGRESS.md).
+
+## Local integrations
+
+`libbyctl plans summary PLAN_ID --json` returns only aggregate action counts,
+without title or card IDs. A Home Assistant command-line sensor or another
+local program can consume this versioned JSON output. Install `libbyctl[mcp]`
+to expose the same saved summaries, saved plan names, and sourced candidate
+libraries through `libbyctl mcp` over a local stdio connection. The MCP server
+has no write tools and does not contact the live account. An HTTP API and an
+automatic `odmpy` trigger remain future work.
 
 ## Development and packaging
 
