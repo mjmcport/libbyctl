@@ -37,6 +37,32 @@ GitHub Releases are configured to build standalone macOS ARM64/Intel, Windows x6
 
 ## Connect Libby
 
+### Browser sign-in prototype
+
+Install Google Chrome, then from the project checkout:
+
+```bash
+uv sync --extra browser
+uv run libbyctl auth browser --test-native
+```
+
+This opens the official Libby site in a separate Chrome profile under libbyctl's
+data directory. Complete **Recover Your Data** with a passkey or the website's
+setup code. The command waits for synchronized cards, restarts the browser to
+verify persistence, then makes one native read-only synchronization request.
+Only a native response matching the browser's cards permits saving a token in
+the OS credential store. No token is printed. A failed test preserves existing
+native credentials. Without `--test-native`, only browser sign-in is verified.
+
+This is a diagnostic prototype, not yet a browser provider for `cards` or
+`search`. Browser-only success does not establish native CLI access, and native
+success does not establish long-term token renewal. The browser profile itself
+contains sensitive session state; do not share it. `auth logout` currently
+removes only the native token, not this browser profile. To clear browser login,
+use Libby's reset option **inside this dedicated profile only**.
+
+### Experimental direct pairing
+
 Run:
 
 ```bash

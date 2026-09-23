@@ -134,6 +134,47 @@ def auth_status() -> None:
     )
 
 
+@auth_app.command("browser")
+def auth_browser(
+    test_native: Annotated[
+        bool, typer.Option(help="Test one native account read and save the token only on success.")
+    ] = False,
+    timeout: Annotated[int, typer.Option(min=30, max=1800)] = 600,
+) -> None:
+    """Sign in on the official Libby website in a dedicated Chrome profile (prototype)."""
+    from libbyctl.providers.libby.browser import connect_browser
+
+    settings = Settings.load()
+    if test_native and settings.libby_base_url.rstrip("/") != "https://sentry.libbyapp.com":
+        raise LibbyCtlError(
+            "Native browser-token testing requires the official Libby provider URL."
+        )
+    session = connect_browser(
+        settings.data_dir / "browser-profile", timeout=timeout, notify=console.print,
+    )
+    console.print(
+        f"[green]Browser connection verified[/green] — {len(session.card_ids)} card(s); "
+        "sign-in survived browser restart."
+    )
+    if not test_native:
+        console.print("Native CLI access has not been tested. Browser credentials remain local.")
+        return
+    console.print("Testing one read-only native account synchronization…")
+    # Never send a browser credential to a configurable provider URL.
+    with LibbyClient(token=session.token) as client:
+        sync = client._request("GET", "chip/sync", retry_missing_chip=False)
+    card_ids = frozenset(str(card.get("cardId", "")) for card in sync.get("cards", []))
+    if sync.get("result") != "synchronized" or card_ids != session.card_ids:
+        raise LibbyCtlError(
+            "Native synchronization did not match the browser account; token not saved."
+        )
+    CredentialStore().set_token(session.token)
+    console.print(
+        "[green]Native account read succeeded[/green]. Token saved in the credential store. "
+        "Long-term renewal and catalog access still need verification."
+    )
+
+
 @auth_app.command("logout")
 def auth_logout() -> None:
     """Delete the stored Libby identity token."""
