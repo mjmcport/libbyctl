@@ -10,20 +10,28 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
     displayed_codes = []
     expiry = 2_000_000_000
     chip_count = 0
+    clone_count = 0
+    chip_id = "abcdef12-3456-7890-abcd-ef1234567890"
 
     def handler(request: httpx.Request) -> httpx.Response:
-        nonlocal chip_count
+        nonlocal chip_count, clone_count
         seen.append(request)
         if request.url.path == "/chip":
             chip_count += 1
-            assert "authorization" not in request.headers
             assert request.url.params["c"] == "d:22.1.1"
+            if chip_count == 1:
+                assert "authorization" not in request.headers
+                assert "r" not in request.url.params
+                return httpx.Response(200, json={"chip": chip_id, "identity": "temporary-token"})
+            if chip_count == 2:
+                assert request.headers["authorization"] == "Bearer temporary-token"
+                assert request.url.params["v"] == "abcdef12"
+                return httpx.Response(200, json={"chip": chip_id, "identity": "refreshed-token"})
+            assert chip_count == 3
+            assert "authorization" not in request.headers
+            assert request.url.params["r"] == chip_id
             return httpx.Response(
-                200,
-                json={
-                    "chip": "temporary-chip" if chip_count == 1 else "paired-chip",
-                    "identity": "temporary-token" if chip_count == 1 else "paired-token",
-                },
+                200, json={"chip": chip_id, "identity": "recovered-token"}
             )
         if request.url.path == "/chip/clone/code" and request.method == "GET":
             assert request.headers["authorization"] == "Bearer temporary-token"
@@ -38,12 +46,16 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
             assert request.url.params["code"] == "22222222"
             return httpx.Response(200, json={"result": "fulfilled", "blessing": "transfer-grant"})
         if request.url.path == "/chip/clone":
-            assert request.headers["authorization"] == "Bearer temporary-token"
             assert request.headers["origin"] == "https://libbyapp.com"
             assert request.read() == b'{"blessing":"transfer-grant"}'
+            clone_count += 1
+            if clone_count == 1:
+                assert request.headers["authorization"] == "Bearer temporary-token"
+                return httpx.Response(403, json={"result": "missing_chip"})
+            assert request.headers["authorization"] == "Bearer refreshed-token"
             return httpx.Response(200, json={"result": "cloned"})
         if request.url.path == "/chip/sync":
-            assert request.headers["authorization"] == "Bearer paired-token"
+            assert request.headers["authorization"] == "Bearer recovered-token"
             return httpx.Response(200, json={"result": "synchronized", "cards": [{"cardId": "1"}]})
         return httpx.Response(404, json={"result": "not_found"})
 
@@ -62,6 +74,8 @@ def test_device_pairing_displays_code_then_accepts_transfer(monkeypatch):
         "/chip/clone/code",
         "/chip/clone/code",
         "/chip/clone/code",
+        "/chip/clone",
+        "/chip",
         "/chip/clone",
         "/chip",
         "/chip/sync",

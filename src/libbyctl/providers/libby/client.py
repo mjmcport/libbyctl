@@ -73,7 +73,15 @@ class LibbyClient:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
 
-    def _request(self, method: str, path: str, *, authenticated: bool = True, **kwargs: Any) -> Any:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        authenticated: bool = True,
+        retry_missing_chip: bool = True,
+        **kwargs: Any,
+    ) -> Any:
         try:
             response = self.client.request(
                 method,
@@ -84,10 +92,25 @@ class LibbyClient:
         except httpx.HTTPError as exc:
             raise ProviderUnavailableError(f"Could not contact Libby: {exc}") from exc
 
+        result = _result_code(response)
+        if result == "missing_chip" and retry_missing_chip and authenticated and path != "chip":
+            if not self.chip_id:
+                raise AuthenticationError(
+                    "Libby reported a missing device identity; "
+                    "this session has no chip ID to recover."
+                )
+            self.refresh_chip()
+            return self._request(
+                method,
+                path,
+                authenticated=authenticated,
+                retry_missing_chip=False,
+                **kwargs,
+            )
+
         if response.status_code in (401, 403):
             endpoint = path.lstrip("/")
             failure = "identity token" if response.status_code == 401 else "request"
-            result = _result_code(response)
             detail = f"; result: {result}" if result else ""
             raise AuthenticationError(
                 f"Libby rejected the {failure} for {endpoint} "
@@ -138,6 +161,21 @@ class LibbyClient:
         self.token = str(token)
         return self.token
 
+    def _reacquire_chip(self) -> str:
+        if not self.chip_id:
+            raise AuthenticationError("No Libby device identity is available to reacquire.")
+        chip_id = self.chip_id
+        params = self._chip_params()
+        params["r"] = chip_id
+        data = self._request("POST", "chip", authenticated=False, params=params)
+        token = data.get("identity")
+        if not token:
+            raise AuthenticationError("Libby did not return a replacement device identity.")
+        if str(data.get("chip")) != chip_id:
+            raise AuthenticationError("Libby returned a different device identity during recovery.")
+        self.token = str(token)
+        return self.token
+
     def login_with_device_pairing(
         self,
         on_code: Callable[[str, float], None],
@@ -164,11 +202,9 @@ class LibbyClient:
                         "Libby did not return a valid device-transfer token."
                     )
                 self._request("POST", "chip/clone", json={"blessing": blessing})
-                # Cloning replaces this device's temporary identity. Libby's recovery flow
-                # discards it and acquires a fresh identity before syncing the recovered data.
+                # Libby drops the temporary token but preserves the chip when it syncs after clone.
                 self.token = None
-                self.chip_id = None
-                self.bootstrap_chip()
+                self._reacquire_chip()
                 return self.sync()
 
             next_code = state.get("code")
