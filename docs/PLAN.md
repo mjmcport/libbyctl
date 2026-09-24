@@ -4,24 +4,27 @@ Updated: 2026-09-23
 
 ## Current status (2026-09-23)
 
-Phase 1 works for one connected account on macOS and the source CLI has passed
-read-only account/catalog checks. Normal setup now uses official-site browser
-sign-in and a native account cross-check. Standalone packaging, diagnostics,
-and partial-search handling have been repaired and are undergoing smoke tests.
-The public-release gate remains open for clean-machine sign-in, naturally
-expired credentials, multiple cards, and Windows/Linux/Intel platform checks.
+Phase 1 now works with two home cards on macOS, connected through direct sign-in
+to a dedicated official-site browser window and verified through a native
+account cross-check. The CLI discovers 22 partner catalogs through those cards.
+Local checks and the Windows/Linux/macOS CI matrix pass. The public-release gate
+remains open for clean-machine sign-in, naturally expired credentials, and
+platform-specific packaged-binary tests. Passkey and setup-code transfer into
+the CLI browser failed in this live session; direct sign-in succeeded.
 
 Phase 2 has begun as a preview: CSV/text/ISBN import, reviewed direct-file URL
 import, normalization, work/edition grouping, explicit match states, and a
 read-only format-specific list availability report. The
-13-title 2026 Booker example received a result for every entry in the connected
-library, but match quality and absent titles still need independent review. The
-CLI identity currently has only one saved card; the user's main Libby app has
-more libraries. Recovering that app's saved cards and discovering unsaved partner
-collections are open before claiming full-account coverage.
+13-title 2026 Booker example was searched across all 24 connected home and
+partner collections. Nine titles had confident audiobook matches, including one
+catalog listing available now; four had no confident match. See
+`docs/PARTNER_LIBRARY_TEST_REPORT.md` for the dated results. Catalog matches
+and partner borrowing eligibility still need independent UI review.
 
-Phase 3 now has persistent read-only plans and refresh. A live one-card check
-classified the 13-title example and saved/refreshed it in an isolated database.
+Phase 3 has persistent read-only plans and refresh. A live two-card check
+classified the 13-title example in a temporary database and selected both home
+cards, without creating any loans or holds. Partner catalogs are not yet used
+for planner actions.
 Phases 4–5 have a provider-neutral circulation engine with confirmation,
 fresh-state checks, and durable retry reconciliation. The private Libby adapter
 now supports explicit borrow/hold/return/suspend/resume/cancel commands. A live

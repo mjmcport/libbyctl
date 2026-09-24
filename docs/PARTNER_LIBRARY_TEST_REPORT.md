@@ -49,6 +49,15 @@ These are public catalog results, not a promise that a visiting card can borrow
 or place a hold on a particular title. Partner borrowing and hold rules differ.
 No loan or hold was created during this scan.
 
+## Two-card planner check
+
+Using a temporary local database, the CLI created a read-only plan for the same
+13 titles with both home cards. The proposals were **3 NOT_OWNED, 4 HOLD, and
+6 SKIP**, with no provider warnings. Proposed entries selected both home cards.
+The temporary plan and database were removed after the aggregate check. This
+planner currently uses home collections only; it does not propose circulation
+actions at partner libraries.
+
 ## Verification and remaining work
 
 - The full local test suite, Ruff, and Pyright passed after partner discovery
