@@ -36,6 +36,10 @@ Chrome and enter that code on the device with your cards under **Menu → Copy T
 Another Device**. Entering a code in Chrome sends Chrome's data in the opposite
 direction.
 
+If you add cards directly in the CLI Chrome window, run `libbyctl setup --min-cards 3`
+(replace `3` with your card count). Setup waits for that many cards before saving
+the connection.
+
 `libbyctl auth status` checks the saved identity. If it expires or is revoked,
 run `libbyctl setup` again. A native session with a saved device chip can attempt
 one refresh; a browser-derived token currently relies on browser reconnection.

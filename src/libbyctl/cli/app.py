@@ -114,6 +114,9 @@ def version() -> None:
 @app.command()
 def setup(
     timeout: Annotated[int, typer.Option(min=30, max=1800)] = 600,
+    min_cards: Annotated[
+        int, typer.Option(min=1, help="Wait for at least this many cards before connecting.")
+    ] = 1,
 ) -> None:
     """Connect through the official Libby website in a dedicated Chrome profile."""
     settings = Settings.load()
@@ -129,7 +132,7 @@ def setup(
         "Display Setup Code in Chrome and enter that code on a Libby device "
         "that has your cards, under Menu > Copy To Another Device."
     )
-    cards = _connect_native_browser(settings, timeout=timeout)
+    cards = _connect_native_browser(settings, timeout=timeout, min_cards=min_cards)
     settings.save()
     initialize_database(settings.database_path)
     console.print(
@@ -140,13 +143,18 @@ def setup(
     console.print("[green]✓[/green] Configuration and local database initialized")
 
 
-def _connect_native_browser(settings: Settings, *, timeout: int = 600) -> list[Card]:
+def _connect_native_browser(
+    settings: Settings, *, timeout: int = 600, min_cards: int = 1
+) -> list[Card]:
     from libbyctl.providers.libby.browser import connect_browser
 
     if settings.libby_base_url.rstrip("/") != "https://sentry.libbyapp.com":
         raise LibbyCtlError("Browser sign-in requires the official Libby provider URL.")
     session = connect_browser(
-        settings.data_dir / "browser-profile", timeout=timeout, notify=console.print,
+        settings.data_dir / "browser-profile",
+        timeout=timeout,
+        min_cards=min_cards,
+        notify=console.print,
     )
     console.print("Verifying this account through a read-only native request…")
     libby, thunder = _clients(settings, session.token)

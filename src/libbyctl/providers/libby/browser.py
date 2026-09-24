@@ -59,8 +59,11 @@ def connect_browser(
     profile: Path,
     *,
     timeout: float = 600,
+    min_cards: int = 1,
     notify: Callable[[str], None] = print,
 ) -> BrowserSession:
+    if min_cards < 1:
+        raise ValueError("min_cards must be at least one")
     try:
         api = importlib.import_module("playwright.sync_api")
     except ImportError:
@@ -78,6 +81,7 @@ def connect_browser(
 
     def wait_for_account(context: Any, page: Any, deadline: float) -> BrowserSession:
         pending: list[Any] = []
+        last_count = 0
 
         def on_response(response: Any) -> None:
             # Filter before reading either headers or JSON from the browser.
@@ -107,7 +111,12 @@ def connect_browser(
                     except Exception:
                         continue
                     if session:
-                        return session
+                        count = len(session.card_ids)
+                        if count >= min_cards:
+                            return session
+                        if count > last_count:
+                            notify(f"Found {count} of {min_cards} required card(s); waiting…")
+                            last_count = count
                 if page.is_closed():
                     raise AuthenticationError(
                         "Browser closed before account verification completed."
@@ -121,7 +130,7 @@ def connect_browser(
                         ) from None
                     raise
             raise AuthenticationError(
-                "Timed out waiting for synchronized library cards. "
+                f"Timed out waiting for {min_cards} synchronized library card(s). "
                 "Run libbyctl auth browser to resume this browser profile."
             )
         finally:

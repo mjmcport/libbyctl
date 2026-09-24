@@ -162,3 +162,64 @@ def test_browser_restarts_same_profile_and_checks_account(monkeypatch, tmp_path,
     if os.name != "nt":
         assert profile.stat().st_mode & 0o777 == 0o700
     assert "private-token" not in " ".join(messages)
+
+
+def test_browser_waits_for_required_card_count(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from libbyctl.providers.libby import browser
+
+    launches = []
+
+    class Context:
+        def __init__(self, batches):
+            self.batches = batches
+            self.pages = [self]
+
+        def on(self, event, listener):
+            self.listener = listener
+
+        def remove_listener(self, event, listener):
+            assert listener is self.listener
+
+        def goto(self, *args, **kwargs):
+            for ids in self.batches:
+                self.listener(
+                    SimpleNamespace(
+                        url=URL,
+                        status=200,
+                        json=lambda ids=ids: {
+                            "result": "synchronized",
+                            "cards": [{"cardId": value} for value in ids],
+                        },
+                        request=SimpleNamespace(header_value=lambda name: "Bearer private-token"),
+                    )
+                )
+
+        def close(self):
+            pass
+
+    def launch(*args, **kwargs):
+        launches.append(None)
+        batches = [["one"], ["one", "two", "three"]] if len(launches) == 1 else [
+            ["one", "two", "three"]
+        ]
+        return Context(batches)
+
+    class Playwright:
+        chromium = SimpleNamespace(launch_persistent_context=launch)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(
+        browser.importlib, "import_module", lambda name: SimpleNamespace(sync_playwright=Playwright)
+    )
+    messages = []
+    session = browser.connect_browser(tmp_path / "profile", min_cards=3, notify=messages.append)
+    assert session.card_ids == frozenset({"one", "two", "three"})
+    assert len(launches) == 2
+    assert "Found 1 of 3 required card(s)" in " ".join(messages)
