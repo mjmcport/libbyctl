@@ -1,0 +1,266 @@
+"""Explicit single-title Libby circulation commands."""
+
+from __future__ import annotations
+
+import json
+from enum import StrEnum
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from libbyctl.domain.models import Card
+from libbyctl.exceptions import LibbyCtlError
+from libbyctl.providers.libby.circulation import CirculationTarget, LibbyCirculationProvider
+from libbyctl.services.account import (
+    cards_from_sync,
+    require_resolved_libraries,
+    website_ids_from_sync,
+)
+from libbyctl.services.circulation import CirculationAction, CirculationIntent, execute
+from libbyctl.services.timeline import summarize_timeline
+
+app = typer.Typer(no_args_is_help=True, help="Review and change one exact title on a linked card.")
+
+
+class Format(StrEnum):
+    ebook = "ebook"
+    audiobook = "audiobook"
+
+
+def _select_card(cards: list[Card], card_number: int | None, library_key: str | None) -> Card:
+    if library_key:
+        matches = [
+            card for card in cards
+            if card.library_key and card.library_key.casefold() == library_key.casefold()
+        ]
+        if not matches:
+            raise LibbyCtlError(
+                "No linked card for that library. Open the partner library in Libby "
+                "and complete its visitor-card setup first."
+            )
+        if len(matches) > 1 and card_number is None:
+            raise LibbyCtlError(
+                "More than one card is linked to that library; select one with --card."
+            )
+        card = matches[0]
+        if card_number is not None and 1 <= card_number <= len(cards):
+            card = cards[card_number - 1]
+        if card_number is not None and (
+            card_number < 1 or card_number > len(cards)
+            or card not in matches
+        ):
+            raise LibbyCtlError("--card and --library select different cards.")
+        return card
+    selected_number = card_number or 1
+    if selected_number < 1 or selected_number > len(cards):
+        raise LibbyCtlError(f"Card number must be between 1 and {len(cards)}.")
+    return cards[selected_number - 1]
+
+
+@app.command("activity")
+def activity(
+    spreadsheet: Annotated[Path, typer.Argument(help="Unfiltered Libby Timeline CSV export")],
+    days: Annotated[int, typer.Option(min=1, help="Recent days to count")] = 7,
+    json_output: Annotated[bool, typer.Option("--json", help="Machine-readable summary")] = False,
+) -> None:
+    """Count recent checkouts and returns across libraries in a Timeline export."""
+    report = summarize_timeline(spreadsheet, days=days)
+    if json_output:
+        typer.echo(json.dumps({
+            "since": report.since.isoformat(timespec="minutes"),
+            "until": report.until.isoformat(timespec="minutes"),
+            "borrowed": report.borrowed,
+            "returned": report.returned,
+            "by_library": report.by_library,
+        }, indent=2))
+        return
+    typer.echo(
+        f"Timeline activity in the past {days} day(s): "
+        f"{report.borrowed} borrowed, {report.returned} returned."
+    )
+    for library, count in report.by_library.items():
+        typer.echo(f"  {library}: {count['borrowed']} borrowed, {count['returned']} returned")
+    typer.echo("Recent events:")
+    for event in report.events[:10]:
+        typer.echo(
+            f"  {event.date:%Y-%m-%d %H:%M}  {event.activity.title():8}  "
+            f"{event.library}  {event.title}"
+        )
+    if not report.events:
+        typer.echo("  None in this export and time window.")
+    typer.echo(
+        "Counts depend on the export's filters and completeness. Libby exports identify "
+        "libraries, not individual cards. Returns do not erase earlier checkouts. "
+        "OverDrive has not published a churning threshold; this is not a borrowing clearance."
+    )
+
+
+@app.command("candidates")
+def candidates(
+    title: Annotated[str, typer.Argument(help="Exact book title")],
+    media_type: Annotated[Format, typer.Option("--format")],
+    author: Annotated[str | None, typer.Option(help="Optional author name to verify")] = None,
+) -> None:
+    """Show exact title IDs and availability before choosing a write target."""
+    from libbyctl.cli.app import _load_account
+
+    _, _, libby, catalog, sync = _load_account()
+    try:
+        libraries = catalog.libraries_by_website_ids(website_ids_from_sync(sync))
+        require_resolved_libraries(website_ids_from_sync(sync), libraries)
+        cards = cards_from_sync(sync, libraries)
+        found = 0
+        for card in cards:
+            if not card.library_key:
+                continue
+            for item in catalog.search_library(
+                card.library_key, title, creator=author,
+                media_type=media_type.value, per_page=24,
+            ):
+                if item.title.casefold() != title.casefold() or item.media_type != media_type:
+                    continue
+                if author and author.casefold() not in " ".join(item.creators).casefold():
+                    continue
+                availability = catalog.availability(card.library_key, item.id)
+                status = "available" if availability.is_available else "wait"
+                typer.echo(
+                    f"{item.id}  {item.title}  {media_type.value}  "
+                    f"{card.library_name or card.library_key}  {status}"
+                )
+                found += 1
+        if not found:
+            typer.echo("No exact matches found on linked cards.")
+    finally:
+        libby.close()
+        catalog.close()
+
+
+def _change(
+    action: CirculationAction, title_id: str, operation_id: str, card_number: int | None,
+    expected_format: Format | None, yes: bool, suspension_days: int | None = None,
+    library_key: str | None = None,
+) -> None:
+    from libbyctl.cli.app import _load_account
+
+    settings, _, libby, catalog, sync = _load_account()
+    try:
+        libraries = catalog.libraries_by_website_ids(website_ids_from_sync(sync))
+        require_resolved_libraries(website_ids_from_sync(sync), libraries)
+        cards = cards_from_sync(sync, libraries)
+        card = _select_card(cards, card_number, library_key)
+        if not card.library_key:
+            raise LibbyCtlError("Selected card has no resolved catalog library.")
+        item = catalog.title(card.library_key, title_id)
+        if item.id != title_id or item.media_type not in {"ebook", "audiobook"}:
+            raise LibbyCtlError("The exact ebook/audiobook title could not be verified.")
+        if expected_format is not None and item.media_type != expected_format:
+            raise LibbyCtlError("The catalog title has a different format than requested.")
+        if not yes:
+            typer.confirm(
+                f"{action.value.title()} {item.title} ({item.media_type}) on "
+                f"{card.library_name or card.library_key}?",
+                abort=True,
+            )
+        target = CirculationTarget(card.id, title_id, card.library_key, item.media_type)
+        provider = LibbyCirculationProvider(libby, catalog, [target])
+        intent = CirculationIntent(
+            operation_id, action, card.id, title_id, media_type=item.media_type,
+            suspension_days=suspension_days,
+        )
+        result = execute(settings.database_path, provider, intent, confirmed=True)
+        state = provider.snapshot()
+        key = (card.id, title_id)
+        visible = key in (state.loans if action == CirculationAction.BORROW else state.holds)
+        if action == CirculationAction.RETURN:
+            visible = key not in state.loans
+        elif action == CirculationAction.CANCEL_HOLD:
+            visible = key not in state.holds
+        elif action == CirculationAction.SUSPEND_HOLD:
+            visible = key in state.suspended_holds
+        elif action == CirculationAction.RESUME_HOLD:
+            visible = key in state.holds and key not in state.suspended_holds
+        if not visible:
+            raise LibbyCtlError(
+                "Libby accepted the request, but the account state has not confirmed it. "
+                "Inspect the account before another attempt."
+            )
+        typer.echo(f"{action.value.replace('_', ' ').title()} {result}; verified in account state.")
+    finally:
+        libby.close()
+        catalog.close()
+
+
+@app.command("borrow")
+def borrow(
+    title_id: Annotated[str, typer.Argument(help="Exact ID from circulation candidates")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    media_type: Annotated[Format, typer.Option("--format")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Borrow one available ebook or audiobook."""
+    _change(CirculationAction.BORROW, title_id, operation_id, card, media_type, yes)
+
+
+@app.command("return")
+def return_loan(
+    title_id: Annotated[str, typer.Argument(help="Exact borrowed title ID")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Return one exact loan and verify it disappeared from the account."""
+    _change(CirculationAction.RETURN, title_id, operation_id, card, None, yes)
+
+
+@app.command("hold")
+def hold(
+    title_id: Annotated[str, typer.Argument(help="Exact ID from circulation candidates")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    media_type: Annotated[Format, typer.Option("--format")],
+    card: Annotated[int | None, typer.Option(min=1, help="Card number from libbyctl cards")] = None,
+    library: Annotated[
+        str | None, typer.Option(help="Stable library key from libbyctl libraries connected")
+    ] = None,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Place one hold on a currently unavailable title."""
+    _change(
+        CirculationAction.HOLD, title_id, operation_id, card, media_type, yes,
+        library_key=library,
+    )
+
+
+@app.command("cancel-hold")
+def cancel_hold(
+    title_id: Annotated[str, typer.Argument(help="Exact held title ID")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Cancel one exact hold and verify it disappeared from the account."""
+    _change(CirculationAction.CANCEL_HOLD, title_id, operation_id, card, None, yes)
+
+
+@app.command("suspend-hold")
+def suspend_hold(
+    title_id: Annotated[str, typer.Argument(help="Exact held title ID")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    days: Annotated[int, typer.Option(min=1, max=30, help="Days to delay delivery")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Pause a hold and verify its suspended state."""
+    _change(CirculationAction.SUSPEND_HOLD, title_id, operation_id, card, None, yes, days)
+
+
+@app.command("resume-hold")
+def resume_hold(
+    title_id: Annotated[str, typer.Argument(help="Exact held title ID")],
+    operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
+    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
+) -> None:
+    """Resume a suspended hold and verify it is active."""
+    _change(CirculationAction.RESUME_HOLD, title_id, operation_id, card, None, yes)

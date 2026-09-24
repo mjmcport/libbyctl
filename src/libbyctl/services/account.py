@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from libbyctl.domain.models import Card, CardCounts, CardLimits, Library
+from libbyctl.exceptions import LibbyCtlError
 
 
 def cards_from_sync(sync: dict[str, Any], libraries: list[Library] | None = None) -> list[Card]:
@@ -21,7 +22,11 @@ def cards_from_sync(sync: dict[str, Any], libraries: list[Library] | None = None
                 name=raw.get("cardName") or raw.get("username") or raw.get("name"),
                 website_id=website_id,
                 library_name=(lib.name if lib else library_raw.get("name")),
-                library_key=(lib.key if lib else library_raw.get("preferredKey") or library_raw.get("key")),
+                library_key=(
+                    lib.key
+                    if lib
+                    else library_raw.get("preferredKey") or library_raw.get("key")
+                ),
                 limits=CardLimits(
                     loans=_maybe_int(limits.get("loan")),
                     holds=_maybe_int(limits.get("hold")),
@@ -44,6 +49,17 @@ def website_ids_from_sync(sync: dict[str, Any]) -> list[int | str]:
         if value is not None and value not in found:
             found.append(value)
     return found
+
+
+def require_resolved_libraries(
+    website_ids: list[int | str], libraries: list[Library]
+) -> None:
+    expected = {str(value) for value in website_ids}
+    resolved = {str(library.website_id) for library in libraries if library.key}
+    if not expected or not expected.issubset(resolved):
+        raise LibbyCtlError(
+            "Some linked libraries did not resolve to catalog keys. Run libbyctl doctor."
+        )
 
 
 def _maybe_int(value: Any) -> int | None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -61,3 +62,52 @@ class SearchResult(BaseModel):
     library: Library
     item: CatalogItem
     availability: Availability | None = None
+
+
+class SearchWarning(BaseModel):
+    library_key: str
+    stage: Literal["search", "availability"]
+    title_id: str | None = None
+    message: str
+
+
+class SearchReport(BaseModel):
+    results: list[SearchResult] = Field(default_factory=list)
+    warnings: list[SearchWarning] = Field(default_factory=list)
+
+
+class ProposedAction(StrEnum):
+    BORROW = "BORROW"
+    HOLD = "HOLD"
+    KEEP_EXISTING_HOLD = "KEEP_EXISTING_HOLD"
+    ALREADY_BORROWED = "ALREADY_BORROWED"
+    SKIP = "SKIP"
+    NOT_OWNED = "NOT_OWNED"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+
+
+class PlanEntry(BaseModel):
+    position: int
+    title: str
+    author: str = ""
+    isbn: str = ""
+    action: ProposedAction
+    library_key: str | None = None
+    card_id: str | None = None
+    title_id: str | None = None
+    media_type: MediaType | None = None
+    score: int | None = None
+    match_score: float | None = None
+    estimated_wait_days: int | None = None
+    reasons: list[str] = Field(default_factory=list)
+    alternatives: int = 0
+
+
+class PlanSnapshot(BaseModel):
+    id: str
+    list_id: str
+    list_name: str
+    created_at: str
+    parent_id: str | None = None
+    entries: list[PlanEntry]
+    warnings: list[str] = Field(default_factory=list)

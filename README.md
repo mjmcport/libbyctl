@@ -1,124 +1,266 @@
 # libbyctl
 
-`libbyctl` is a planner-first command-line interface for Libby/OverDrive. It is designed to answer a simple question across every library card you have:
+`libbyctl` helps you search the catalogs connected to your Libby account and
+compare ebook and audiobook availability. It can import reading lists, make
+read-only loan/hold plans, and compare sourced candidate libraries. Explicit
+single-title borrow, hold, return, and hold management are available through
+the connected Libby account. Bulk account changes are not exposed yet.
 
-> Where can I get this book, and what is the best path to it?
+This is an unofficial alpha. It uses interfaces that can change, and it is not
+affiliated with OverDrive or Libby.
 
-The project starts read-only: connect Libby, discover your cards, search all linked libraries, and compare live availability. Holds, borrowing, bulk returns, list planning, and nonresident-card scouting are phased in after the read-only foundation is validated.
+## Install and connect
 
-> **Alpha / unofficial:** libbyctl is not affiliated with or endorsed by OverDrive or Libby. It uses interfaces also used by the Libby web application and community projects; those interfaces can change.
-
-## Quick start
-
-### macOS — current developer build
+For a source installation, install the browser extra:
 
 ```bash
-uv tool install .
+uv tool install 'libbyctl[browser]'
 libbyctl setup
 libbyctl cards
-libbyctl search "The Bee Sting" --author "Paul Murray"
-```
-
-For the first public release the intended installation becomes:
-
-```bash
-brew install libbyctl/tap/libbyctl
-libbyctl setup
-```
-
-GitHub Releases are configured to build standalone macOS ARM64/Intel, Windows x64, and Linux x64 binaries when a version tag is pushed.
-
-## Connect Libby
-
-Run:
-
-```bash
-libbyctl setup
-```
-
-In Libby, use **Settings → Copy To Another Device**, reveal the 8-digit setup code, and enter it when prompted. The resulting identity token is stored in the OS credential store rather than the config file or SQLite database.
-
-Advanced/recovery users can provide an existing token:
-
-```bash
-libbyctl auth token
-libbyctl auth status
-```
-
-or set `LIBBYCTL_TOKEN` for a temporary process environment.
-
-## Search all linked libraries
-
-```bash
-libbyctl search "Project Hail Mary"
-libbyctl search "The Bee Sting" --author "Paul Murray"
-libbyctl search "Orbital" --format audiobook
-libbyctl search "Orbital" --json
-```
-
-## Diagnose setup
-
-```bash
+libbyctl search 'The Hobbit' --format ebook
 libbyctl doctor
 ```
 
-## Current v0.1 scope
+The standalone release binary includes the browser runtime. Install Google
+Chrome before running `libbyctl setup`. Setup opens the official Libby site in
+a dedicated Chrome profile. Recover data with a passkey or setup code, or sign
+into each home card directly. The tool verifies that cards persist after
+restarting the browser, then verifies the same cards through a read-only
+account request. Only then does it save the native identity in the OS
+credential store. If verification fails, the existing credential is retained.
 
-Implemented:
+During recovery, Chrome is the **new** device. Prefer **Recover With Passkey**
+using a passkey created under **Menu → Back Up Your Data** on a Libby device
+that still has your cards. For a setup code, choose **Display Setup Code** in
+Chrome and enter that code on the device with your cards under **Menu → Copy To
+Another Device**. Entering a code in Chrome sends Chrome's data in the opposite
+direction.
 
-- guided Libby setup-code login
-- secure credential abstraction
-- account/card sync
-- linked-library resolution
-- Thunder catalog search
-- per-title availability checks
-- multi-library concurrent search
-- Rich terminal tables
-- JSON output
-- local SQLite initialization
-- `doctor`
-- test suite
-- PyInstaller specification
-- GitHub Actions test/release workflows
+If you add cards directly in the CLI Chrome window, run `libbyctl setup --min-cards 2`
+(replace `2` with your home card count). Setup waits for that many cards before saving
+the connection.
 
-Deliberately not enabled yet:
+`libbyctl auth status` checks the saved identity. If it expires or is revoked,
+run `libbyctl setup` again. A native session with a saved device chip can attempt
+one refresh; a browser-derived token currently relies on browser reconnection.
+Long-term renewal has not been proven with a naturally expired account. The
+dedicated browser profile contains sensitive session state. `libbyctl auth logout`
+removes both that profile and the native identity from this computer; it does not
+reset another Libby device.
 
-- borrow
-- place/cancel/suspend holds
-- return/renew
-- bulk circulation
-- reading-list planner
-- paid/nonresident-card scout
+Advanced users can import an existing token with `libbyctl auth token`, or use
+`LIBBYCTL_TOKEN` for one process. A bare token has no device chip for refresh.
 
-Those are the next phases described in [`docs/PLAN.md`](docs/PLAN.md).
-
-## Development
+## Search
 
 ```bash
-git clone <your-repository-url>
-cd libbyctl
-uv sync --extra dev
-uv run pytest
-uv run libbyctl --help
+libbyctl search 'The Hobbit' --author Tolkien
+libbyctl search 'The Hobbit' --format audiobook --library my-library-key
+libbyctl search 'The Hobbit' --format audiobook --include-partners
+libbyctl search 'The Hobbit' --json
+libbyctl libraries connected
 ```
 
-## Build a standalone binary
+`--format` accepts `ebook` or `audiobook`; unknown library keys are rejected with
+the available choices. JSON search output is an object with `results` and
+`warnings` arrays. A library search failure keeps results from other libraries
+and is reported in `warnings`; unavailable availability metadata is also marked
+as a warning and the affected result has `availability: null`. If every selected
+library fails, the command exits with status 2. `doctor` exits with status 2
+when a required check fails.
+`libraries connected` lists home collections and the partner collections reachable
+through each home card. It marks partner collections whose visitor card is linked.
+Add `--include-partners` to search those partner catalogs.
+
+## Reading lists (Phase 2 preview)
 
 ```bash
-uv sync --extra dev
+libbyctl lists import examples/booker-2026-longlist.csv --name 'Booker 2026'
+libbyctl lists show booker-2026
+libbyctl lists match booker-2026 --json
+```
+
+CSV files need `title` and/or `isbn` headers; `author` is optional. Text files
+accept one title per line, optionally followed by an em dash and author. `.isbn`
+files accept one ISBN per line and validate its check digit. URL import currently
+accepts direct HTTPS `.csv`, `.txt`, or `.isbn` files. It previews all items
+and prints a SHA-256 fingerprint; repeat with that fingerprint to save the same
+content after review:
+
+```bash
+libbyctl lists import-url 'https://example.org/books.csv' --name 'My list'
+libbyctl lists import-url 'https://example.org/books.csv' --name 'My list' --confirm SHA256_FROM_PREVIEW
+```
+
+Matching groups equivalent title/author editions across libraries. Each item is
+reported as `matched`, `ambiguous`, `unmatched`, or `incomplete` if a library
+search failed. Scores are suggestions for review, not evidence that two catalog
+records are the same work. Import and match make no circulation changes.
+
+To check one format for the saved list, use:
+
+```bash
+libbyctl lists availability booker-2026 --format audiobook
+libbyctl lists availability booker-2026 --format audiobook --include-partners
+libbyctl lists availability booker-2026 --format audiobook --json
+```
+
+This checks the home catalog collections associated with cards on the **CLI's
+connected Libby identity**. Add `--include-partners` to discover and check the
+partner collections reachable through those cards. You can connect the CLI by
+recovering data from another Libby device or signing into each home card in the
+dedicated CLI browser. Use `setup --min-cards N` when adding cards directly so
+setup waits for all `N` home cards. If the CLI is connected to the wrong
+identity, `libbyctl auth logout` clears only the CLI's identity and browser
+profile; it leaves the main Libby app and local reading lists intact. Catalog
+availability does not guarantee that a particular card can borrow a title;
+partner borrowing and hold rules can differ by library.
+
+The bundled 2026 Booker longlist example is transcribed from the
+[official Booker announcement](https://thebookerprizes.com/media-centre/press-releases/longlist-for-booker-prize-2026-rewards-risk).
+
+## Read-only plans
+
+```bash
+libbyctl plan booker-2026
+libbyctl plans list
+libbyctl plans show PLAN_ID --json
+libbyctl plans refresh PLAN_ID
+```
+
+Plans compare the current loans and holds, catalog matches, availability, format
+preferences, and known card limits. They propose `BORROW`, `HOLD`,
+`KEEP_EXISTING_HOLD`, `ALREADY_BORROWED`, `SKIP`, `NOT_OWNED`, or `NEEDS_REVIEW`.
+The proposal reserves capacity for earlier entries but never changes the library
+account. Weak or ambiguous matches, unknown ownership, and incomplete searches need
+review. A refreshed plan is saved as a new snapshot; the old one remains intact.
+
+## Single-title circulation (preview)
+
+Find an exact edition ID, then use a stable operation ID for each intended
+change. The command shows the book and card for confirmation; `--yes` is for an
+action you have already reviewed.
+
+```bash
+libbyctl circulation candidates 'Pride and Prejudice' --format ebook --author 'Jane Austen'
+libbyctl circulation borrow TITLE_ID --format ebook --operation-id my-borrow-1
+libbyctl circulation return TITLE_ID --operation-id my-return-1
+libbyctl circulation hold TITLE_ID --format ebook --operation-id my-hold-1
+libbyctl circulation suspend-hold TITLE_ID --days 7 --operation-id my-suspend-1
+libbyctl circulation resume-hold TITLE_ID --operation-id my-resume-1
+libbyctl circulation cancel-hold TITLE_ID --operation-id my-cancel-1
+```
+
+Each command reads fresh account and catalog state before a write and verifies
+the account state afterward. If a response is uncertain, retry with the same
+operation ID so the tool can reconcile the result without repeating the write.
+Use a new operation ID only for a distinct action after resolving a structured
+rejection. The private Libby service is undocumented; library account rules can
+refuse an otherwise available title. In the September 2026 live test, borrow
+requests were refused with `PatronExceededChurningLimit`, while a temporary hold
+was placed, suspended, resumed, and canceled successfully. No test loan or hold
+remained afterward.
+
+### Holds at partner libraries
+
+Partner catalog search does not establish hold eligibility. In a Libby session
+synchronized with the CLI identity, open the partner collection, find the exact
+audiobook or ebook, choose **Place Hold**, and select **Continue** when Libby offers to set up
+access with a home card. This links a visitor card to the account. The CLI can
+then see its separate hold limit with `libbyctl cards`, and
+`libbyctl libraries connected` marks that partner as `card linked`. The final
+hold can be placed in Libby or through the CLI:
+
+```bash
+libbyctl circulation hold TITLE_ID --format audiobook \
+  --library bpl --operation-id my-bpl-hold-1
+```
+
+`--library` selects a linked card by stable catalog key, so adding another card
+does not change the target. If several cards are linked to the same collection,
+use `--card` as well to choose one. The CLI checks current capacity and exact
+title availability, submits one hold, then verifies it in the account. Partner
+libraries may disallow holds or give visiting patrons different limits and wait
+priority. See [Libby's partnership help](https://help.libbyapp.com/en-us/6350.htm)
+and the [live partner hold test](docs/PARTNER_HOLD_TEST_REPORT.md).
+
+## Review recent borrowing activity
+
+Libby's [Timeline](https://help.libbyapp.com/en-us/categories/reading-history.htm)
+shows borrowing and returns from all linked libraries. In Libby, open **Shelf →
+Timeline → Actions → Export Timeline → Spreadsheet** and save an **unfiltered**
+export. Then run:
+
+```bash
+libbyctl circulation activity PATH_TO_EXPORTED_CSV
+libbyctl circulation activity PATH_TO_EXPORTED_CSV --days 14 --json
+```
+
+The command reads the CSV locally, counts recent borrowed and returned events
+by library, and shows the ten most recent events. It does not store or upload the
+export. Libby's export identifies the library, not the individual card, so
+multiple cards at one library cannot be separated. Filters applied before export
+can hide activity; [recover card history](https://help.libbyapp.com/en-us/6281.htm)
+in Libby if older activity is missing. Returns do not cancel checkout events in
+this report. The count is useful context for a `PatronExceededChurningLimit`
+rejection, but OverDrive has not published a reliable threshold or scope for that
+restriction, so the tool does not claim that another borrow will succeed.
+
+## Candidate libraries
+
+`libbyctl libraries import FILE.json` accepts an array of reviewed records with
+`name`, `library_key`, `eligibility_area`, `eligibility_rule`, `membership_fee_usd`,
+`term_months`, `online_join`, `libby_access`, `official_source_url` (HTTPS), and
+`verified_on` (ISO date). No candidate records ship with the app; verify the
+official eligibility and fee source before importing one.
+
+```bash
+libbyctl libraries import my-candidates.json
+libbyctl libraries list
+libbyctl scout booker-2026 --area Michigan
+libbyctl scout booker-2026 --plan-id PLAN_ID --json
+```
+
+`scout` compares public catalog coverage with the latest saved plan for the
+list. It shows newly covered titles, immediate availability, shorter estimated
+waits, preferred-format coverage, fee, source age, and eligibility text. These
+are research leads: a matching area does not establish membership eligibility
+or personalized borrowing access.
+
+The circulation engine keeps an audit record without credentials or title/card
+IDs. Renewal has a private-client method but is not exposed as a CLI command
+until its account-state checks are verified. See
+[`docs/PHASE3_TO_PHASE8_PROGRESS.md`](docs/PHASE3_TO_PHASE8_PROGRESS.md).
+
+## Local integrations
+
+`libbyctl plans summary PLAN_ID --json` returns only aggregate action counts,
+without title or card IDs. A Home Assistant command-line sensor or another
+local program can consume this versioned JSON output. Install `libbyctl[mcp]`
+to expose the same saved summaries, saved plan names, and sourced candidate
+libraries through `libbyctl mcp` over a local stdio connection. The MCP server
+has no write tools and does not contact the live account. An HTTP API and an
+automatic `odmpy` trigger remain future work.
+
+## Development and packaging
+
+```bash
+uv sync --extra dev --extra browser
+uv run pytest
+uv run ruff check src tests
+uv run pyright --pythonpath .venv/bin/python src
 uv run pyinstaller packaging/pyinstaller/libbyctl.spec --noconfirm
 ./dist/libbyctl version
 ```
 
-PyInstaller builds for the platform it is running on; the GitHub Actions release matrix handles each operating system separately.
+The release workflow builds Python artifacts and macOS ARM64/Intel, Windows x64,
+and Linux x64 preview binaries. A clean-machine first-run test on each platform
+is still required before calling the release generally distributable. See
+[`docs/PLAN.md`](docs/PLAN.md) and [`docs/PHASE1_TEST_REPORT.md`](docs/PHASE1_TEST_REPORT.md).
 
-## Safety and privacy
-
-- Libby identity tokens are never written to `config.toml` or the local SQLite database.
-- Card display values are masked in normal terminal output.
-- JSON output can contain account metadata; treat it as private.
-- Write/circulation operations are intentionally absent from v0.1.
+Identity tokens are not written to configuration or SQLite. Card JSON and
+reading lists may be personal; avoid sharing their output or local data files.
 
 ## License
 
-MIT. This repository is an independent clean implementation informed by publicly observable service behavior and public community documentation; it does not copy source from the GPL Calibre plugin.
+MIT.

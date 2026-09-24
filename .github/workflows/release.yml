@@ -34,8 +34,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --extra dev
+      - run: uv sync --extra dev --extra browser
       - run: uv run pyinstaller packaging/pyinstaller/libbyctl.spec --noconfirm
+      - name: Smoke Unix binary and bundled browser driver
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          ./dist/libbyctl version
+          ./dist/libbyctl auth browser --check-runtime
+      - name: Smoke Windows binary and bundled browser driver
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\dist\libbyctl.exe version
+          .\dist\libbyctl.exe auth browser --check-runtime
       - name: Package Unix binary
         if: runner.os != 'Windows'
         shell: bash

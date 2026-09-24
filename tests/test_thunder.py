@@ -23,11 +23,18 @@ def test_search_and_availability_parsing():
         if request.url.path.endswith("/availability"):
             return httpx.Response(
                 200,
-                json={"isAvailable": False, "ownedCopies": 3, "holdsCount": 6, "estimatedWaitDays": 14},
+                json={
+                    "isAvailable": False,
+                    "ownedCopies": 3,
+                    "holdsCount": 6,
+                    "estimatedWaitDays": 14,
+                },
             )
         return httpx.Response(404, json={})
 
-    provider = ThunderCatalogProvider("https://example.test/v2", transport=httpx.MockTransport(handler))
+    provider = ThunderCatalogProvider(
+        "https://example.test/v2", transport=httpx.MockTransport(handler)
+    )
     items = provider.search_library("demo", "Example")
     availability = provider.availability("demo", "42")
     provider.close()

@@ -18,5 +18,9 @@ class ProviderUnavailableError(ProviderError):
     pass
 
 
+class CirculationRejectedError(ProviderError):
+    """A structured provider refusal that confirms the requested write was rejected."""
+
+
 class ConfigurationError(LibbyCtlError):
     pass

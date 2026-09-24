@@ -2,6 +2,44 @@
 
 Updated: 2026-09-23
 
+## Current status (2026-09-23)
+
+Phase 1 now works with two home cards on macOS, connected through direct sign-in
+to a dedicated official-site browser window and verified through a native
+account cross-check. The CLI discovers 22 partner catalogs through those cards.
+Local checks and the Windows/Linux/macOS CI matrix pass. The public-release gate
+remains open for clean-machine sign-in, naturally expired credentials, and
+platform-specific packaged-binary tests. Passkey and setup-code transfer into
+the CLI browser failed in this live session; direct sign-in succeeded.
+
+Phase 2 has begun as a preview: CSV/text/ISBN import, reviewed direct-file URL
+import, normalization, work/edition grouping, explicit match states, and a
+read-only format-specific list availability report. The
+13-title 2026 Booker example was searched across all 24 connected home and
+partner collections. Nine titles had confident audiobook matches, including one
+catalog listing available now; four had no confident match. See
+`docs/PARTNER_LIBRARY_TEST_REPORT.md` for the dated results. Catalog matches
+and partner borrowing eligibility initially needed independent UI review.
+Four partner visitor cards have since been linked and tested with holds.
+
+Phase 3 has persistent read-only plans and refresh. A live two-card check
+classified the 13-title example in a temporary database and selected both home
+cards, without creating any loans or holds. After Libby links a visitor card,
+the planner can consider that partner card; partner catalogs without a linked
+card are not proposed for circulation actions.
+Phases 4–5 have a provider-neutral circulation engine with confirmation,
+fresh-state checks, and durable retry reconciliation. The private Libby adapter
+now supports explicit borrow/hold/return/suspend/resume/cancel commands. A live
+hold, suspend, resume, and cancel succeeded; ebook/audiobook borrow was refused
+by an account activity limit. See `docs/PRIVATE_CIRCULATION_RESEARCH.md`.
+Eight Booker audiobook holds were subsequently placed and verified through
+four partner visitor cards. See `docs/PARTNER_HOLD_TEST_REPORT.md`.
+Phases 6–7 have a sourced-record registry and catalog comparison, with
+no published eligibility records until location and official terms are verified.
+Phase 8 has aggregate JSON and an optional read-only local MCP stdio server;
+the HTTP API, Home Assistant-specific setup, and `odmpy` trigger remain open.
+See `docs/PHASE3_TO_PHASE8_PROGRESS.md` for test evidence and remaining gates.
+
 ## Product direction
 
 `libbyctl` is not a downloader. It is the discovery, planning, and circulation-control layer for a user's Libby libraries. Download workflows such as `odmpy` remain separate downstream tools.
@@ -24,7 +62,7 @@ Acceptance: a tagged release can produce Python artifacts plus macOS ARM64, macO
 
 ## Phase 1 — read-only Libby account + catalog — initial usable release
 
-- guided 8-digit setup-code authentication
+- guided official-site browser authentication, with passkey or setup-code recovery
 - account synchronization
 - linked card discovery
 - Thunder library resolution
@@ -215,23 +253,30 @@ LibbyAccountProvider
 
 No application/planner code should contain endpoint URLs or private protocol payload details.
 
-## v0.1 endpoint assumptions isolated in adapters
+## Private endpoint assumptions isolated in adapters
 
-The current account adapter uses the Libby web service pattern observed in current community clients:
+The native account adapter uses the Libby web service pattern observed in current community clients:
 
-- bootstrap identity chip
-- clone with 8-digit setup code
+- browser-assisted identity import after official-site recovery
+- legacy experimental chip/bootstrap and setup-code clone methods
 - sync account state
 
-The catalog adapter uses the current Thunder v2 library/media/availability surface. These are implementation details, not public contracts, so contract tests and provider isolation are mandatory.
+Direct CLI pairing has not passed a live test and is no longer the normal setup
+path. The catalog adapter uses the current Thunder v2
+library/media/availability surface. These are implementation details, not public
+contracts, so contract tests and provider isolation are mandatory.
 
 ## Immediate next engineering work
 
-1. Test setup-code auth against a real account on macOS.
-2. Capture sanitized fixture shapes for actual sync/card responses.
-3. Validate library-key resolution for every linked card.
-4. Validate search and wait-time fields against Libby UI.
-5. Add cache with 15-minute availability TTL.
-6. Add retry/backoff and token refresh-on-403.
-7. Add GitHub repository URL and Homebrew tap automation.
-8. Begin Phase 2 list/matching work only after the read-only foundation is verified.
+1. Run normal `setup` from a packaged binary on a clean macOS machine with
+   Chrome, then repeat on Windows and Linux; verify the browser driver and
+   credential backend on each platform.
+2. Observe natural token expiry or use a disposable account for revocation;
+   verify reconnect keeps a good credential if interrupted.
+3. Compare availability for the same title, format, edition, and card against
+   the official Libby UI, and test multiple distinct cards.
+4. Review the three unmatched 2026 Booker titles and representative matched
+   editions in the official catalog; adjust scoring before planning relies on it.
+5. Add bounded retry/backoff and a 15-minute availability cache after the
+   provider behavior is validated. Prepare Homebrew distribution only after
+   the clean-machine gate passes.

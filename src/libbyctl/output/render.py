@@ -26,7 +26,9 @@ def cards_table(cards: list[Card]) -> None:
         loans = f"{card.counts.loans}/{card.limits.loans if card.limits.loans is not None else '?'}"
         holds = f"{card.counts.holds}/{card.limits.holds if card.limits.holds is not None else '?'}"
         display_card = _mask(card.name or card.id)
-        table.add_row(card.library_name or card.library_key or "Unknown", display_card, loans, holds)
+        table.add_row(
+            card.library_name or card.library_key or "Unknown", display_card, loans, holds
+        )
     console.print(table)
 
 

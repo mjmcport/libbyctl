@@ -1,5 +1,12 @@
+import pytest
+
 from libbyctl.domain.models import Library
-from libbyctl.services.account import cards_from_sync, website_ids_from_sync
+from libbyctl.exceptions import LibbyCtlError
+from libbyctl.services.account import (
+    cards_from_sync,
+    require_resolved_libraries,
+    website_ids_from_sync,
+)
 
 
 def test_cards_tolerate_missing_card_name():
@@ -19,3 +26,10 @@ def test_cards_tolerate_missing_card_name():
     assert cards[0].name == "ALT-NAME"
     assert cards[0].library_key == "example"
     assert website_ids_from_sync(sync) == [77]
+
+
+def test_missing_catalog_library_is_explicit():
+    with pytest.raises(LibbyCtlError, match="did not resolve"):
+        require_resolved_libraries(
+            [77, 88], [Library(website_id=77, name="One", key="one")]
+        )

@@ -14,7 +14,7 @@ class ThunderCatalogProvider:
         base_url: str = "https://thunder.api.overdrive.com/v2",
         client_id: str = "dewey",
         timeout: float = 20.0,
-        transport: httpx.BaseTransport | httpx.AsyncBaseTransport | None = None,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.client_id = client_id
@@ -32,7 +32,7 @@ class ThunderCatalogProvider:
     def close(self) -> None:
         self.client.close()
 
-    def __enter__(self) -> "ThunderCatalogProvider":
+    def __enter__(self) -> ThunderCatalogProvider:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -57,6 +57,20 @@ class ThunderCatalogProvider:
             {"websiteIds": ",".join(str(x) for x in website_ids), "perPage": 100, "page": 1},
         )
         return [self._parse_library(x) for x in data.get("items", [])]
+
+    def visitable_library_ids(self, library_key: str) -> list[int | str]:
+        """Return public partner collection IDs reachable from a home library."""
+        raw = self._get(f"libraries/{library_key}").get("visitableLibraries")
+        if not isinstance(raw, list) or any(
+            isinstance(value, bool)
+            or not isinstance(value, int | str)
+            or not str(value).strip()
+            for value in raw
+        ):
+            raise ProviderUnavailableError(
+                f"Partner library list is unavailable for {library_key}."
+            )
+        return list(dict.fromkeys(raw))
 
     def search_library(
         self,
@@ -93,11 +107,19 @@ class ThunderCatalogProvider:
             lucky_day_available_copies=_int_or_none(data.get("luckyDayAvailableCopies")),
         )
 
+    def title(self, library_key: str, title_id: str) -> CatalogItem:
+        return self._parse_item(self._get(f"libraries/{library_key}/media/{title_id}"))
+
     @staticmethod
     def _parse_library(raw: dict[str, Any]) -> Library:
         return Library(
             website_id=raw.get("websiteId", ""),
-            name=raw.get("name") or raw.get("collectionName") or raw.get("preferredKey") or "Unknown library",
+            name=(
+                raw.get("name")
+                or raw.get("collectionName")
+                or raw.get("preferredKey")
+                or "Unknown library"
+            ),
             key=raw.get("preferredKey") or raw.get("key") or raw.get("libraryKey") or "",
         )
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Discover partner collections from connected home libraries and list their access routes.
+- Search partner catalogs on request, including audiobook availability for imported lists.
+- Wait for a specified number of home cards during browser setup and verify the raw card count.
+- Clarify the direction of Libby setup-code transfers and support direct card sign-in.
+
 ## 0.1.0 - 2026-09-23
 
 - Initial project skeleton.
