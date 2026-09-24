@@ -58,6 +58,20 @@ class ThunderCatalogProvider:
         )
         return [self._parse_library(x) for x in data.get("items", [])]
 
+    def visitable_library_ids(self, library_key: str) -> list[int | str]:
+        """Return public partner collection IDs reachable from a home library."""
+        raw = self._get(f"libraries/{library_key}").get("visitableLibraries")
+        if not isinstance(raw, list) or any(
+            isinstance(value, bool)
+            or not isinstance(value, int | str)
+            or not str(value).strip()
+            for value in raw
+        ):
+            raise ProviderUnavailableError(
+                f"Partner library list is unavailable for {library_key}."
+            )
+        return list(dict.fromkeys(raw))
+
     def search_library(
         self,
         library_key: str,

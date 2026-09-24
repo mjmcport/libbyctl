@@ -136,17 +136,21 @@ def show_list(
 def match_list(
     list_id: Annotated[str, typer.Argument()],
     json_output: Annotated[bool, typer.Option("--json")] = False,
+    include_partners: Annotated[
+        bool, typer.Option("--include-partners", help="Search connected partner catalogs too.")
+    ] = False,
 ) -> None:
     """Resolve each item to zero, one, or ambiguous work groups."""
     from libbyctl.cli.app import _load_account
-    from libbyctl.services.account import require_resolved_libraries, website_ids_from_sync
+    from libbyctl.services.connected_libraries import connected_libraries
 
     name, items = load_list(Settings.load().database_path, list_id)
     _, _, libby, catalog, sync = _load_account()
     try:
-        websites = website_ids_from_sync(sync)
-        libraries = catalog.libraries_by_website_ids(websites)
-        require_resolved_libraries(websites, libraries)
+        libraries = [
+            entry.library
+            for entry in connected_libraries(sync, catalog, include_partners=include_partners)
+        ]
         matches: list[ItemMatch] = []
         warnings: set[str] = set()
         for item in items:
@@ -188,17 +192,21 @@ def list_availability(
     list_id: Annotated[str, typer.Argument(help="Saved reading-list ID")],
     media_type: Annotated[ListFormat, typer.Option("--format")] = ListFormat.audiobook,
     json_output: Annotated[bool, typer.Option("--json")] = False,
+    include_partners: Annotated[
+        bool, typer.Option("--include-partners", help="Search connected partner catalogs too.")
+    ] = False,
 ) -> None:
-    """Check one format across the collections of the connected Libby cards."""
+    """Check one format across home libraries and optional partner catalogs."""
     from libbyctl.cli.app import _load_account
-    from libbyctl.services.account import require_resolved_libraries, website_ids_from_sync
+    from libbyctl.services.connected_libraries import connected_libraries
 
     _, items = load_list(Settings.load().database_path, list_id)
     settings, _, libby, catalog, sync = _load_account()
     try:
-        websites = website_ids_from_sync(sync)
-        libraries = catalog.libraries_by_website_ids(websites)
-        require_resolved_libraries(websites, libraries)
+        libraries = [
+            entry.library
+            for entry in connected_libraries(sync, catalog, include_partners=include_partners)
+        ]
         reports = check_list_availability(
             items, libraries, catalog,
             media_type=media_type.value, max_concurrency=settings.max_concurrency,
@@ -210,12 +218,15 @@ def list_availability(
         typer.echo(json.dumps({
             "schema_version": 1,
             "format": media_type.value,
+            "include_partners": include_partners,
             "searched_libraries": [library.name for library in libraries],
             "items": [asdict(report) for report in reports],
         }, indent=2))
         return
-    typer.echo(f"{media_type.value.title()} catalog availability across "
-               f"{len(libraries)} saved-card collection(s):")
+    typer.echo(
+        f"{media_type.value.title()} catalog availability across "
+        f"{len(libraries)} connected collection(s):"
+    )
     for report in reports:
         title = report.item.title or report.item.isbn
         available = [offer for offer in report.offers if offer.available_now is True]
@@ -242,7 +253,6 @@ def list_availability(
         typer.echo(f"{title}: {detail}")
         if report.match_status in {"ambiguous", "review", "incomplete"}:
             typer.echo(f"  Review needed: {report.match_status}")
-    typer.echo(
-        "Scope: saved-card collections only. Unsaved partner collections are not searched. "
-        "Catalog availability does not guarantee this card can borrow a title."
-    )
+    if not include_partners:
+        typer.echo("Scope: home card collections only. Add --include-partners to search partners.")
+    typer.echo("Catalog availability does not guarantee this card can borrow a title.")

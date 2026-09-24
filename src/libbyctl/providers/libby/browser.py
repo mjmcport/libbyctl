@@ -19,6 +19,7 @@ from libbyctl.exceptions import AuthenticationError
 class BrowserSession:
     token: str = field(repr=False)
     card_ids: frozenset[str] = field(repr=False)
+    card_count: int = field(default=0, repr=False)
 
 
 def session_from_sync(
@@ -42,7 +43,7 @@ def session_from_sync(
     ids = [str(card.get("cardId", "")) for card in cards if isinstance(card, dict)]
     if not token or len(ids) != len(cards) or any(not value for value in ids):
         return None
-    return BrowserSession(token, frozenset(ids))
+    return BrowserSession(token, frozenset(ids), len(cards))
 
 
 def browser_runtime_ok() -> bool:
@@ -111,7 +112,7 @@ def connect_browser(
                     except Exception:
                         continue
                     if session:
-                        count = len(session.card_ids)
+                        count = session.card_count or len(session.card_ids)
                         if count >= min_cards:
                             return session
                         if count > last_count:
@@ -160,7 +161,8 @@ def connect_browser(
             finally:
                 context.close()
             notify(
-                f"Found {len(first.card_ids)} card(s). Reopening to verify saved browser sign-in…"
+                f"Found {first.card_count or len(first.card_ids)} card(s). "
+                "Reopening to verify saved browser sign-in…"
             )
             context = launch(playwright)
             try:
@@ -171,7 +173,7 @@ def connect_browser(
                 )
             finally:
                 context.close()
-            if first.card_ids != second.card_ids:
+            if first.card_ids != second.card_ids or first.card_count != second.card_count:
                 raise AuthenticationError(
                     "The card list changed after restart; connection not saved."
                 )

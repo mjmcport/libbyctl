@@ -23,11 +23,11 @@ libbyctl doctor
 
 The standalone release binary includes the browser runtime. Install Google
 Chrome before running `libbyctl setup`. Setup opens the official Libby site in
-a dedicated Chrome profile. Complete **Recover Your Data** there with a passkey
-or setup code. The tool verifies that cards persist after restarting the browser,
-then verifies the same cards through a read-only account request. Only then does
-it save the native identity in the OS credential store. If verification fails,
-the existing native credential is retained.
+a dedicated Chrome profile. Recover data with a passkey or setup code, or sign
+into each home card directly. The tool verifies that cards persist after
+restarting the browser, then verifies the same cards through a read-only
+account request. Only then does it save the native identity in the OS
+credential store. If verification fails, the existing credential is retained.
 
 During recovery, Chrome is the **new** device. Prefer **Recover With Passkey**
 using a passkey created under **Menu → Back Up Your Data** on a Libby device
@@ -36,8 +36,8 @@ Chrome and enter that code on the device with your cards under **Menu → Copy T
 Another Device**. Entering a code in Chrome sends Chrome's data in the opposite
 direction.
 
-If you add cards directly in the CLI Chrome window, run `libbyctl setup --min-cards 3`
-(replace `3` with your card count). Setup waits for that many cards before saving
+If you add cards directly in the CLI Chrome window, run `libbyctl setup --min-cards 2`
+(replace `2` with your home card count). Setup waits for that many cards before saving
 the connection.
 
 `libbyctl auth status` checks the saved identity. If it expires or is revoked,
@@ -56,7 +56,9 @@ Advanced users can import an existing token with `libbyctl auth token`, or use
 ```bash
 libbyctl search 'The Hobbit' --author Tolkien
 libbyctl search 'The Hobbit' --format audiobook --library my-library-key
+libbyctl search 'The Hobbit' --format audiobook --include-partners
 libbyctl search 'The Hobbit' --json
+libbyctl libraries connected
 ```
 
 `--format` accepts `ebook` or `audiobook`; unknown library keys are rejected with
@@ -66,6 +68,8 @@ and is reported in `warnings`; unavailable availability metadata is also marked
 as a warning and the affected result has `availability: null`. If every selected
 library fails, the command exits with status 2. `doctor` exits with status 2
 when a required check fails.
+`libraries connected` lists home collections and the partner collections reachable
+through each saved card. Add `--include-partners` to search those partner catalogs.
 
 ## Reading lists (Phase 2 preview)
 
@@ -96,19 +100,20 @@ To check one format for the saved list, use:
 
 ```bash
 libbyctl lists availability booker-2026 --format audiobook
+libbyctl lists availability booker-2026 --format audiobook --include-partners
 libbyctl lists availability booker-2026 --format audiobook --json
 ```
 
-This checks the catalog collections associated with cards on the **CLI's
-connected Libby identity**. Connect the CLI through **Recover Your Data** from
-the Libby app that has your saved cards; adding one card to a fresh browser
-identity does not copy the others. If the CLI is already connected to the wrong
-identity, run `libbyctl auth logout` and then `libbyctl setup`, selecting
-**Recover Your Data** in the new browser window. This removes only the CLI's
-saved identity and dedicated browser profile; it leaves the main Libby app and
-local reading lists intact. The command reports public catalog
-availability, not a guarantee that a particular card can borrow. Partner
-collections without a saved card are not searched yet.
+This checks the home catalog collections associated with cards on the **CLI's
+connected Libby identity**. Add `--include-partners` to discover and check the
+partner collections reachable through those cards. You can connect the CLI by
+recovering data from another Libby device or signing into each home card in the
+dedicated CLI browser. Use `setup --min-cards N` when adding cards directly so
+setup waits for all `N` home cards. If the CLI is connected to the wrong
+identity, `libbyctl auth logout` clears only the CLI's identity and browser
+profile; it leaves the main Libby app and local reading lists intact. Catalog
+availability does not guarantee that a particular card can borrow a title;
+partner borrowing and hold rules can differ by library.
 
 The bundled 2026 Booker longlist example is transcribed from the
 [official Booker announcement](https://thebookerprizes.com/media-centre/press-releases/longlist-for-booker-prize-2026-rewards-risk).

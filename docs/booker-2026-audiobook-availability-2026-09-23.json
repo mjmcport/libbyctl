@@ -1,0 +1,689 @@
+{
+  "schema_version": 1,
+  "format": "audiobook",
+  "include_partners": true,
+  "searched_libraries": [
+    "Up North Digital Collection",
+    "Minuteman Library Network",
+    "Bay County Library System",
+    "Boston Public Library",
+    "CLAMS",
+    "CW MARS",
+    "Download Destination",
+    "Genesee District Library",
+    "Great Lakes Digital Libraries",
+    "Jackson District Library",
+    "Lakeland Digital Library",
+    "Merrimack Valley Library Consortium",
+    "Metro Net Library Consortium",
+    "Mideastern Michigan Library Cooperative",
+    "Midwest Collaborative for Library Services",
+    "NOBLE: North of Boston Library Exchange",
+    "Old Colony Library Network",
+    "SAILS Library Network",
+    "Southwest Michigan Digital Library",
+    "St. Clair County Library System",
+    "Suburban Library Cooperative",
+    "Traverse Area District Library",
+    "White Pine Library Cooperative",
+    "Woodlands Downloadable Library"
+  ],
+  "items": [
+    {
+      "item": {
+        "title": "The Shadow of the Object",
+        "author": "Chloe Aridjis",
+        "isbn": ""
+      },
+      "match_status": "unmatched",
+      "match_score": null,
+      "offers": [],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "Switzy",
+        "author": "Emma Cline",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Boston Public Library",
+          "library_key": "bpl",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 25,
+          "estimated_wait_days": 98
+        },
+        {
+          "library": "Minuteman Library Network",
+          "library_key": "minuteman",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 15,
+          "estimated_wait_days": 161
+        },
+        {
+          "library": "Download Destination",
+          "library_key": "tln",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 2,
+          "estimated_wait_days": 406
+        },
+        {
+          "library": "Genesee District Library",
+          "library_key": "thegdl",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 490
+        },
+        {
+          "library": "Midwest Collaborative for Library Services",
+          "library_key": "mlc",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 1246
+        },
+        {
+          "library": "CLAMS",
+          "library_key": "clamsnet",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 8,
+          "estimated_wait_days": 1312
+        },
+        {
+          "library": "CW MARS",
+          "library_key": "cwmars",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": null
+        },
+        {
+          "library": "Old Colony Library Network",
+          "library_key": "ocln",
+          "title_id": "12776941",
+          "available_now": false,
+          "owned_copies": 2,
+          "estimated_wait_days": null
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "Helen of Nowhere",
+        "author": "Makenna Goodman",
+        "isbn": ""
+      },
+      "match_status": "unmatched",
+      "match_score": null,
+      "offers": [],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "The End of Everything",
+        "author": "M. John Harrison",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Download Destination",
+          "library_key": "tln",
+          "title_id": "13473948",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 439
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "The Disappearers",
+        "author": "Marlon James",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Merrimack Valley Library Consortium",
+          "library_key": "mvlc",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 168
+        },
+        {
+          "library": "Boston Public Library",
+          "library_key": "bpl",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 15,
+          "estimated_wait_days": 185
+        },
+        {
+          "library": "Download Destination",
+          "library_key": "tln",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 332
+        },
+        {
+          "library": "NOBLE: North of Boston Library Exchange",
+          "library_key": "noble",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 9,
+          "estimated_wait_days": 367
+        },
+        {
+          "library": "Minuteman Library Network",
+          "library_key": "minuteman",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 438
+        },
+        {
+          "library": "Lakeland Digital Library",
+          "library_key": "lakeland",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 2,
+          "estimated_wait_days": 560
+        },
+        {
+          "library": "CLAMS",
+          "library_key": "clamsnet",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 658
+        },
+        {
+          "library": "CW MARS",
+          "library_key": "cwmars",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 756
+        },
+        {
+          "library": "SAILS Library Network",
+          "library_key": "sails",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 5,
+          "estimated_wait_days": 868
+        },
+        {
+          "library": "Midwest Collaborative for Library Services",
+          "library_key": "mlc",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 1596
+        },
+        {
+          "library": "Old Colony Library Network",
+          "library_key": "ocln",
+          "title_id": "12821749",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": null
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "Black Bag",
+        "author": "Luke Kennard",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Boston Public Library",
+          "library_key": "bpl",
+          "title_id": "12588043",
+          "available_now": false,
+          "owned_copies": 5,
+          "estimated_wait_days": 160
+        },
+        {
+          "library": "Midwest Collaborative for Library Services",
+          "library_key": "mlc",
+          "title_id": "12588043",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 336
+        },
+        {
+          "library": "Mideastern Michigan Library Cooperative",
+          "library_key": "mmlc",
+          "title_id": "12588043",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 364
+        },
+        {
+          "library": "CW MARS",
+          "library_key": "cwmars",
+          "title_id": "12588043",
+          "available_now": false,
+          "owned_copies": 2,
+          "estimated_wait_days": 588
+        },
+        {
+          "library": "Minuteman Library Network",
+          "library_key": "minuteman",
+          "title_id": "12588043",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 1134
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "The Renovation",
+        "author": "Kenan Orhan",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Boston Public Library",
+          "library_key": "bpl",
+          "title_id": "13551497",
+          "available_now": true,
+          "owned_copies": 105,
+          "estimated_wait_days": 1
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "May We Feed the King",
+        "author": "Rebecca Perry",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Download Destination",
+          "library_key": "tln",
+          "title_id": "13551626",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 663
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "The Palm House",
+        "author": "Gwendoline Riley",
+        "isbn": ""
+      },
+      "match_status": "unmatched",
+      "match_score": null,
+      "offers": [],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "The Things We Never Say",
+        "author": "Elizabeth Strout",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "St. Clair County Library System",
+          "library_key": "stclaircounty",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 147
+        },
+        {
+          "library": "Jackson District Library",
+          "library_key": "myjdl",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 196
+        },
+        {
+          "library": "Mideastern Michigan Library Cooperative",
+          "library_key": "mmlc",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 196
+        },
+        {
+          "library": "Boston Public Library",
+          "library_key": "bpl",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 30,
+          "estimated_wait_days": 205
+        },
+        {
+          "library": "Genesee District Library",
+          "library_key": "thegdl",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 214
+        },
+        {
+          "library": "Merrimack Valley Library Consortium",
+          "library_key": "mvlc",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 30,
+          "estimated_wait_days": 220
+        },
+        {
+          "library": "Minuteman Library Network",
+          "library_key": "minuteman",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 137,
+          "estimated_wait_days": 232
+        },
+        {
+          "library": "Southwest Michigan Digital Library",
+          "library_key": "smdl",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 2,
+          "estimated_wait_days": 238
+        },
+        {
+          "library": "Up North Digital Collection",
+          "library_key": "upnorth",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 7,
+          "estimated_wait_days": 256
+        },
+        {
+          "library": "Great Lakes Digital Libraries",
+          "library_key": "gldl",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 2,
+          "estimated_wait_days": 308
+        },
+        {
+          "library": "White Pine Library Cooperative",
+          "library_key": "fuelyourmind",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 364
+        },
+        {
+          "library": "Download Destination",
+          "library_key": "tln",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 5,
+          "estimated_wait_days": 367
+        },
+        {
+          "library": "Old Colony Library Network",
+          "library_key": "ocln",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 40,
+          "estimated_wait_days": 392
+        },
+        {
+          "library": "CW MARS",
+          "library_key": "cwmars",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 49,
+          "estimated_wait_days": 399
+        },
+        {
+          "library": "Traverse Area District Library",
+          "library_key": "tadl",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 406
+        },
+        {
+          "library": "Suburban Library Cooperative",
+          "library_key": "slc",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 490
+        },
+        {
+          "library": "CLAMS",
+          "library_key": "clamsnet",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 25,
+          "estimated_wait_days": 1911
+        },
+        {
+          "library": "NOBLE: North of Boston Library Exchange",
+          "library_key": "noble",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 15,
+          "estimated_wait_days": 2114
+        },
+        {
+          "library": "Midwest Collaborative for Library Services",
+          "library_key": "mlc",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 12,
+          "estimated_wait_days": 4480
+        },
+        {
+          "library": "Lakeland Digital Library",
+          "library_key": "lakeland",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": null
+        },
+        {
+          "library": "SAILS Library Network",
+          "library_key": "sails",
+          "title_id": "12368824",
+          "available_now": false,
+          "owned_copies": 19,
+          "estimated_wait_days": null
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "John of John",
+        "author": "Douglas Stuart",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "St. Clair County Library System",
+          "library_key": "stclaircounty",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 5,
+          "estimated_wait_days": 194
+        },
+        {
+          "library": "CW MARS",
+          "library_key": "cwmars",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 25,
+          "estimated_wait_days": 238
+        },
+        {
+          "library": "Minuteman Library Network",
+          "library_key": "minuteman",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 59,
+          "estimated_wait_days": 241
+        },
+        {
+          "library": "NOBLE: North of Boston Library Exchange",
+          "library_key": "noble",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 385
+        },
+        {
+          "library": "Download Destination",
+          "library_key": "tln",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 425
+        },
+        {
+          "library": "Old Colony Library Network",
+          "library_key": "ocln",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 14,
+          "estimated_wait_days": 439
+        },
+        {
+          "library": "Merrimack Valley Library Consortium",
+          "library_key": "mvlc",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 10,
+          "estimated_wait_days": 672
+        },
+        {
+          "library": "SAILS Library Network",
+          "library_key": "sails",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 5,
+          "estimated_wait_days": 924
+        },
+        {
+          "library": "CLAMS",
+          "library_key": "clamsnet",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 17,
+          "estimated_wait_days": 1330
+        },
+        {
+          "library": "Midwest Collaborative for Library Services",
+          "library_key": "mlc",
+          "title_id": "12449445",
+          "available_now": false,
+          "owned_copies": 6,
+          "estimated_wait_days": 2968
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "All Them Dogs",
+        "author": "Djamel White",
+        "isbn": ""
+      },
+      "match_status": "matched",
+      "match_score": 1.0,
+      "offers": [
+        {
+          "library": "Boston Public Library",
+          "library_key": "bpl",
+          "title_id": "12269976",
+          "available_now": false,
+          "owned_copies": 4,
+          "estimated_wait_days": 193
+        },
+        {
+          "library": "Mideastern Michigan Library Cooperative",
+          "library_key": "mmlc",
+          "title_id": "12269976",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 196
+        },
+        {
+          "library": "CW MARS",
+          "library_key": "cwmars",
+          "title_id": "12269976",
+          "available_now": false,
+          "owned_copies": 3,
+          "estimated_wait_days": 287
+        },
+        {
+          "library": "Midwest Collaborative for Library Services",
+          "library_key": "mlc",
+          "title_id": "12269976",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": 518
+        },
+        {
+          "library": "CLAMS",
+          "library_key": "clamsnet",
+          "title_id": "12269976",
+          "available_now": false,
+          "owned_copies": 1,
+          "estimated_wait_days": null
+        }
+      ],
+      "failed_libraries": []
+    },
+    {
+      "item": {
+        "title": "The Vivisectors",
+        "author": "Missouri Williams",
+        "isbn": ""
+      },
+      "match_status": "unmatched",
+      "match_score": null,
+      "offers": [],
+      "failed_libraries": []
+    }
+  ]
+}

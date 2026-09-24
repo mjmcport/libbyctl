@@ -30,6 +30,7 @@ from libbyctl.services.account import (
     require_resolved_libraries,
     website_ids_from_sync,
 )
+from libbyctl.services.connected_libraries import connected_libraries
 from libbyctl.services.search import search_libraries
 from libbyctl.storage.database import database_ok, initialize_database
 
@@ -127,10 +128,10 @@ def setup(
         )
     )
     console.print(
-        "Chrome is the new device. On its Welcome screen, choose Yes, I Have a "
-        "Library Card > Recover Your Data. Use Recover With Passkey, or choose "
-        "Display Setup Code in Chrome and enter that code on a Libby device "
-        "that has your cards, under Menu > Copy To Another Device."
+        "Chrome is libbyctl's separate Libby window. On Welcome, choose Yes, I Have a "
+        "Library Card. You can add each home card directly, or choose Recover Your Data. "
+        "For recovery, use a passkey or display the setup code in this window and enter "
+        "it on the Libby device that already has your cards."
     )
     cards = _connect_native_browser(settings, timeout=timeout, min_cards=min_cards)
     settings.save()
@@ -160,8 +161,13 @@ def _connect_native_browser(
     libby, thunder = _clients(settings, session.token)
     try:
         sync = libby.sync()
-        card_ids = frozenset(str(card.get("cardId", "")) for card in sync.get("cards", []))
-        if not card_ids or card_ids != session.card_ids:
+        synced_cards = sync.get("cards", [])
+        card_ids = frozenset(str(card.get("cardId", "")) for card in synced_cards)
+        if (
+            not card_ids
+            or card_ids != session.card_ids
+            or (session.card_count and len(synced_cards) != session.card_count)
+        ):
             raise LibbyCtlError("Native account did not match the browser cards; credentials kept.")
         website_ids = website_ids_from_sync(sync)
         libraries = thunder.libraries_by_website_ids(website_ids)
@@ -222,7 +228,8 @@ def auth_browser(
         settings.data_dir / "browser-profile", timeout=timeout, notify=console.print,
     )
     console.print(
-        f"[green]Browser connection verified[/green] — {len(session.card_ids)} card(s); "
+        f"[green]Browser connection verified[/green] — "
+        f"{session.card_count or len(session.card_ids)} card(s); "
         "sign-in survived browser restart."
     )
     if not test_native:
@@ -233,7 +240,11 @@ def auth_browser(
     with LibbyClient(token=session.token) as client:
         sync = client._request("GET", "chip/sync", retry_missing_chip=False)
     card_ids = frozenset(str(card.get("cardId", "")) for card in sync.get("cards", []))
-    if sync.get("result") != "synchronized" or card_ids != session.card_ids:
+    if (
+        sync.get("result") != "synchronized"
+        or card_ids != session.card_ids
+        or (session.card_count and len(sync.get("cards", [])) != session.card_count)
+    ):
         raise LibbyCtlError(
             "Native synchronization did not match the browser account; token not saved."
         )
@@ -311,13 +322,17 @@ def search(
         bool, typer.Option("--json", help="Return machine-readable JSON")
     ] = False,
     per_library: Annotated[int, typer.Option(min=1, max=24)] = 5,
+    include_partners: Annotated[
+        bool, typer.Option("--include-partners", help="Search connected partner catalogs too.")
+    ] = False,
 ) -> None:
-    """Search every linked library and compare availability."""
+    """Search home libraries and optional partner catalogs."""
     settings, _, libby, thunder, sync = _load_account()
     try:
-        websites = website_ids_from_sync(sync)
-        libraries = thunder.libraries_by_website_ids(websites)
-        require_resolved_libraries(websites, libraries)
+        libraries = [
+            entry.library
+            for entry in connected_libraries(sync, thunder, include_partners=include_partners)
+        ]
         if library:
             wanted = {x.lower() for x in library}
             known = {lib.key.lower() for lib in libraries}

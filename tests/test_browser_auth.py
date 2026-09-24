@@ -14,8 +14,23 @@ def test_accepts_authenticated_sync_without_exposing_session():
     session = session_from_sync(URL, 200, SYNC, "Bearer secret-token")
     assert session is not None
     assert session.card_ids == frozenset({"card-one"})
+    assert session.card_count == 1
     assert "secret-token" not in repr(session)
     assert "card-one" not in repr(session)
+
+
+def test_counts_card_entries_even_when_ids_repeat():
+    body = {
+        "result": "synchronized",
+        "cards": [
+            {"cardId": "shared", "websiteId": 1},
+            {"cardId": "shared", "websiteId": 2},
+        ],
+    }
+    session = session_from_sync(URL, 200, body, "Bearer secret-token")
+    assert session is not None
+    assert session.card_count == 2
+    assert session.card_ids == frozenset({"shared"})
 
 
 @pytest.mark.parametrize(
@@ -201,8 +216,8 @@ def test_browser_waits_for_required_card_count(monkeypatch, tmp_path):
 
     def launch(*args, **kwargs):
         launches.append(None)
-        batches = [["one"], ["one", "two", "three"]] if len(launches) == 1 else [
-            ["one", "two", "three"]
+        batches = [["one"], ["one", "two", "two"]] if len(launches) == 1 else [
+            ["one", "two", "two"]
         ]
         return Context(batches)
 
@@ -220,6 +235,7 @@ def test_browser_waits_for_required_card_count(monkeypatch, tmp_path):
     )
     messages = []
     session = browser.connect_browser(tmp_path / "profile", min_cards=3, notify=messages.append)
-    assert session.card_ids == frozenset({"one", "two", "three"})
+    assert session.card_count == 3
+    assert session.card_ids == frozenset({"one", "two"})
     assert len(launches) == 2
     assert "Found 1 of 3 required card(s)" in " ".join(messages)

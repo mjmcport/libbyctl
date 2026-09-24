@@ -20,6 +20,46 @@ from libbyctl.storage.registry import load_candidates, save_candidates
 app = typer.Typer(no_args_is_help=True, help="Manage sourced candidate library records.")
 
 
+@app.command("connected")
+def connected_library_list(
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """List home and partner collections available through saved cards."""
+    from libbyctl.cli.app import _load_account
+    from libbyctl.services.connected_libraries import connected_libraries
+
+    _, _, libby, catalog, sync = _load_account()
+    try:
+        entries = connected_libraries(sync, catalog)
+    finally:
+        libby.close()
+        catalog.close()
+    if json_output:
+        typer.echo(json.dumps([
+            {
+                "name": entry.library.name,
+                "key": entry.library.key,
+                "website_id": entry.library.website_id,
+                "access": entry.access,
+                "via_home_keys": list(entry.via_home_keys),
+            }
+            for entry in entries
+        ], indent=2))
+        return
+    home_names = {
+        entry.library.key: entry.library.name
+        for entry in entries if entry.access == "home"
+    }
+    homes = [entry for entry in entries if entry.access == "home"]
+    partners = [entry for entry in entries if entry.access == "partner"]
+    typer.echo(f"{len(homes)} home collection(s), {len(partners)} partner collection(s)")
+    for entry in homes:
+        typer.echo(f"Home: {entry.library.name} ({entry.library.key})")
+    for entry in partners:
+        via = ", ".join(home_names[key] for key in entry.via_home_keys)
+        typer.echo(f"Partner: {entry.library.name} ({entry.library.key}) — via {via}")
+
+
 @app.command("import")
 def import_registry(
     path: Annotated[Path, typer.Argument(exists=True, file_okay=True, dir_okay=False)],
