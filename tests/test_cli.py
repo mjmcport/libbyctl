@@ -3,6 +3,8 @@ from typer.testing import CliRunner
 
 from libbyctl import cli
 from libbyctl.cli.app import app
+from libbyctl.cli.circulation import _select_card
+from libbyctl.domain.models import Card
 from libbyctl.exceptions import LibbyCtlError
 
 runner = CliRunner()
@@ -32,3 +34,22 @@ def test_main_reports_cli_errors_without_traceback(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "Libby is not connected" in captured.err
     assert captured.out == ""
+
+
+def test_hold_selects_linked_partner_card_by_library_key():
+    cards = [
+        Card(id="home", library_key="minuteman"),
+        Card(id="visitor", library_key="bpl"),
+    ]
+    assert _select_card(cards, None, "BPL").id == "visitor"
+    with pytest.raises(LibbyCtlError, match="visitor-card setup"):
+        _select_card(cards, None, "mvlc")
+    with pytest.raises(LibbyCtlError, match="different cards"):
+        _select_card(cards, 1, "bpl")
+
+
+def test_hold_requires_card_number_when_same_library_has_multiple_cards():
+    cards = [Card(id="a", library_key="bpl"), Card(id="b", library_key="bpl")]
+    with pytest.raises(LibbyCtlError, match="More than one card"):
+        _select_card(cards, None, "bpl")
+    assert _select_card(cards, 2, "bpl").id == "b"

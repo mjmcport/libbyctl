@@ -69,7 +69,8 @@ as a warning and the affected result has `availability: null`. If every selected
 library fails, the command exits with status 2. `doctor` exits with status 2
 when a required check fails.
 `libraries connected` lists home collections and the partner collections reachable
-through each saved card. Add `--include-partners` to search those partner catalogs.
+through each home card. It marks partner collections whose visitor card is linked.
+Add `--include-partners` to search those partner catalogs.
 
 ## Reading lists (Phase 2 preview)
 
@@ -159,6 +160,29 @@ refuse an otherwise available title. In the September 2026 live test, borrow
 requests were refused with `PatronExceededChurningLimit`, while a temporary hold
 was placed, suspended, resumed, and canceled successfully. No test loan or hold
 remained afterward.
+
+### Holds at partner libraries
+
+Partner catalog search does not establish hold eligibility. In a Libby session
+synchronized with the CLI identity, open the partner collection, find the exact
+audiobook or ebook, choose **Place Hold**, and select **Continue** when Libby offers to set up
+access with a home card. This links a visitor card to the account. The CLI can
+then see its separate hold limit with `libbyctl cards`, and
+`libbyctl libraries connected` marks that partner as `card linked`. The final
+hold can be placed in Libby or through the CLI:
+
+```bash
+libbyctl circulation hold TITLE_ID --format audiobook \
+  --library bpl --operation-id my-bpl-hold-1
+```
+
+`--library` selects a linked card by stable catalog key, so adding another card
+does not change the target. If several cards are linked to the same collection,
+use `--card` as well to choose one. The CLI checks current capacity and exact
+title availability, submits one hold, then verifies it in the account. Partner
+libraries may disallow holds or give visiting patrons different limits and wait
+priority. See [Libby's partnership help](https://help.libbyapp.com/en-us/6350.htm)
+and the [live partner hold test](docs/PARTNER_HOLD_TEST_REPORT.md).
 
 ## Review recent borrowing activity
 

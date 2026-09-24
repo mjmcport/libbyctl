@@ -68,11 +68,11 @@ actions at partner libraries.
 - Passkey and setup-code transfers into the CLI browser returned to Welcome;
   the passkey attempt showed a 403 from Libby's `chip/clone` endpoint. Direct
   sign-in to the CLI browser succeeded and survived a browser restart.
-- Partner catalog searches are read-only. Circulation commands currently
-  require a card whose home key equals the target library key, so they cannot
-  borrow from a partner collection. Before adding that capability, validate
-  Libby's visiting-card rules and title-level eligibility in a live, controlled
-  test. Do not infer borrowability from the public availability flag alone.
+- Partner catalog searches alone remain read-only. After this scan, Libby's
+  official interface linked visitor cards for four partner collections; eight
+  Booker audiobook holds were then placed and verified through those cards.
+  See [the partner hold test](PARTNER_HOLD_TEST_REPORT.md). A public availability
+  flag alone still does not establish personalized eligibility.
 
 To repeat the read-only scan:
 

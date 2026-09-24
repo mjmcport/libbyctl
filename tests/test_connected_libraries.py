@@ -38,8 +38,36 @@ def test_resolves_and_deduplicates_partner_libraries_with_home_relationships():
         "home", "home", "partner", "partner", "partner"
     ]
     assert entries[3].via_home_keys == ("home-a", "home-b")
+    assert [entry.card_connected for entry in entries] == [
+        True, True, False, False, False
+    ]
     assert [entry.library.key for entry in connected_libraries(
         SYNC, Catalog(), include_partners=False
+    )] == ["home-a", "home-b"]
+
+
+def test_linked_visitor_card_remains_a_partner():
+    sync = {
+        "cards": [
+            *SYNC["cards"],
+            {
+                "cardId": "visitor",
+                "library": {"websiteId": 3},
+                "homeLibraryWebsiteId": 1,
+            },
+        ]
+    }
+    entries = connected_libraries(sync, Catalog())
+    assert [entry.library.key for entry in entries] == [
+        "home-a", "home-b", "partner-c", "partner-d", "partner-e"
+    ]
+    assert [entry.access for entry in entries] == [
+        "home", "home", "partner", "partner", "partner"
+    ]
+    assert entries[2].via_home_keys == ("home-a",)
+    assert entries[2].card_connected
+    assert [entry.library.key for entry in connected_libraries(
+        sync, Catalog(), include_partners=False
     )] == ["home-a", "home-b"]
 
 

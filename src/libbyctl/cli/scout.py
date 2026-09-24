@@ -42,6 +42,7 @@ def connected_library_list(
                 "website_id": entry.library.website_id,
                 "access": entry.access,
                 "via_home_keys": list(entry.via_home_keys),
+                "card_connected": entry.card_connected,
             }
             for entry in entries
         ], indent=2))
@@ -57,7 +58,8 @@ def connected_library_list(
         typer.echo(f"Home: {entry.library.name} ({entry.library.key})")
     for entry in partners:
         via = ", ".join(home_names[key] for key in entry.via_home_keys)
-        typer.echo(f"Partner: {entry.library.name} ({entry.library.key}) — via {via}")
+        linked = " — card linked" if entry.card_connected else ""
+        typer.echo(f"Partner: {entry.library.name} ({entry.library.key}) — via {via}{linked}")
 
 
 @app.command("import")

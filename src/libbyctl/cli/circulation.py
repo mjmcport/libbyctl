@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 
+from libbyctl.domain.models import Card
 from libbyctl.exceptions import LibbyCtlError
 from libbyctl.providers.libby.circulation import CirculationTarget, LibbyCirculationProvider
 from libbyctl.services.account import (
@@ -25,6 +26,36 @@ app = typer.Typer(no_args_is_help=True, help="Review and change one exact title 
 class Format(StrEnum):
     ebook = "ebook"
     audiobook = "audiobook"
+
+
+def _select_card(cards: list[Card], card_number: int | None, library_key: str | None) -> Card:
+    if library_key:
+        matches = [
+            card for card in cards
+            if card.library_key and card.library_key.casefold() == library_key.casefold()
+        ]
+        if not matches:
+            raise LibbyCtlError(
+                "No linked card for that library. Open the partner library in Libby "
+                "and complete its visitor-card setup first."
+            )
+        if len(matches) > 1 and card_number is None:
+            raise LibbyCtlError(
+                "More than one card is linked to that library; select one with --card."
+            )
+        card = matches[0]
+        if card_number is not None and 1 <= card_number <= len(cards):
+            card = cards[card_number - 1]
+        if card_number is not None and (
+            card_number < 1 or card_number > len(cards)
+            or card not in matches
+        ):
+            raise LibbyCtlError("--card and --library select different cards.")
+        return card
+    selected_number = card_number or 1
+    if selected_number < 1 or selected_number > len(cards):
+        raise LibbyCtlError(f"Card number must be between 1 and {len(cards)}.")
+    return cards[selected_number - 1]
 
 
 @app.command("activity")
@@ -106,8 +137,9 @@ def candidates(
 
 
 def _change(
-    action: CirculationAction, title_id: str, operation_id: str, card_number: int,
+    action: CirculationAction, title_id: str, operation_id: str, card_number: int | None,
     expected_format: Format | None, yes: bool, suspension_days: int | None = None,
+    library_key: str | None = None,
 ) -> None:
     from libbyctl.cli.app import _load_account
 
@@ -116,9 +148,7 @@ def _change(
         libraries = catalog.libraries_by_website_ids(website_ids_from_sync(sync))
         require_resolved_libraries(website_ids_from_sync(sync), libraries)
         cards = cards_from_sync(sync, libraries)
-        if card_number < 1 or card_number > len(cards):
-            raise LibbyCtlError(f"Card number must be between 1 and {len(cards)}.")
-        card = cards[card_number - 1]
+        card = _select_card(cards, card_number, library_key)
         if not card.library_key:
             raise LibbyCtlError("Selected card has no resolved catalog library.")
         item = catalog.title(card.library_key, title_id)
@@ -189,11 +219,17 @@ def hold(
     title_id: Annotated[str, typer.Argument(help="Exact ID from circulation candidates")],
     operation_id: Annotated[str, typer.Option(help="Stable ID for safe retry")],
     media_type: Annotated[Format, typer.Option("--format")],
-    card: Annotated[int, typer.Option(min=1, help="Card number from libbyctl cards")] = 1,
+    card: Annotated[int | None, typer.Option(min=1, help="Card number from libbyctl cards")] = None,
+    library: Annotated[
+        str | None, typer.Option(help="Stable library key from libbyctl libraries connected")
+    ] = None,
     yes: Annotated[bool, typer.Option(help="Confirm the displayed exact action")] = False,
 ) -> None:
     """Place one hold on a currently unavailable title."""
-    _change(CirculationAction.HOLD, title_id, operation_id, card, media_type, yes)
+    _change(
+        CirculationAction.HOLD, title_id, operation_id, card, media_type, yes,
+        library_key=library,
+    )
 
 
 @app.command("cancel-hold")

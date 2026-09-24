@@ -19,17 +19,21 @@ read-only format-specific list availability report. The
 partner collections. Nine titles had confident audiobook matches, including one
 catalog listing available now; four had no confident match. See
 `docs/PARTNER_LIBRARY_TEST_REPORT.md` for the dated results. Catalog matches
-and partner borrowing eligibility still need independent UI review.
+and partner borrowing eligibility initially needed independent UI review.
+Four partner visitor cards have since been linked and tested with holds.
 
 Phase 3 has persistent read-only plans and refresh. A live two-card check
 classified the 13-title example in a temporary database and selected both home
-cards, without creating any loans or holds. Partner catalogs are not yet used
-for planner actions.
+cards, without creating any loans or holds. After Libby links a visitor card,
+the planner can consider that partner card; partner catalogs without a linked
+card are not proposed for circulation actions.
 Phases 4–5 have a provider-neutral circulation engine with confirmation,
 fresh-state checks, and durable retry reconciliation. The private Libby adapter
 now supports explicit borrow/hold/return/suspend/resume/cancel commands. A live
 hold, suspend, resume, and cancel succeeded; ebook/audiobook borrow was refused
 by an account activity limit. See `docs/PRIVATE_CIRCULATION_RESEARCH.md`.
+Eight Booker audiobook holds were subsequently placed and verified through
+four partner visitor cards. See `docs/PARTNER_HOLD_TEST_REPORT.md`.
 Phases 6–7 have a sourced-record registry and catalog comparison, with
 no published eligibility records until location and official terms are verified.
 Phase 8 has aggregate JSON and an optional read-only local MCP stdio server;
